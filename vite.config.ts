@@ -21,12 +21,35 @@ function pdfWorker(): Plugin {
   };
 }
 
+// CSP（GitHub Pages 無法設定 header，用 meta）；只在 build 加入，避免干擾 dev server 的 HMR
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'", // eruda 會插入 <style>
+  "img-src 'self' blob:",
+  "worker-src 'self' blob:", // pdf.js worker
+  "connect-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+].join('; ');
+
+function csp(): Plugin {
+  return {
+    name: 'inkbook-csp',
+    apply: 'build',
+    transformIndexHtml: () => [
+      { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP }, injectTo: 'head-prepend' },
+    ],
+  };
+}
+
 // 🔒 base、manifest id、scope 上線後不可修改（見 CLAUDE.md §1）
 export default defineConfig({
   base: '/inkbook/',
   plugins: [
     preact(),
     pdfWorker(),
+    csp(),
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
