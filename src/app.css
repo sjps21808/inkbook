@@ -36,3 +36,13 @@ html, body {
   text-align: center;
   margin-top: 20vh;
 }
+
+.update-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  font-size: 15px;
+  color: #fff;
+  background: #0a84ff;
+  border: none;
+  border-radius: 8px;
+}
