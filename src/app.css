@@ -31,6 +31,12 @@ html, body {
   padding: 24px 16px;
 }
 
+.version {
+  color: #aeaeb2;
+  font-size: 12px;
+  text-align: center;
+}
+
 .empty {
   color: #8e8e93;
   text-align: center;

@@ -5,6 +5,7 @@ import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const require = createRequire(import.meta.url);
+const { version } = require('./package.json') as { version: string };
 
 // pdf.js worker 以固定檔名輸出到 dist，讓 service worker 預先快取（M5 用 BASE_URL + 檔名載入）
 function pdfWorker(): Plugin {
@@ -46,6 +47,7 @@ function csp(): Plugin {
 // 🔒 base、manifest id、scope 上線後不可修改（見 CLAUDE.md §1）
 export default defineConfig({
   base: '/inkbook/',
+  define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     preact(),
     pdfWorker(),
