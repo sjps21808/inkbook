@@ -1,0 +1,38 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+  background: #f2f2f5;
+  color: #1c1c1e;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top);
+  background: #fff;
+  border-bottom: 1px solid #d1d1d6;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.library {
+  padding: 24px 16px;
+}
+
+.empty {
+  color: #8e8e93;
+  text-align: center;
+  margin-top: 20vh;
+}
