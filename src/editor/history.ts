@@ -9,17 +9,27 @@ export interface Command {
 
 /** 整本筆記共用的 undo/redo 紀錄；只存在記憶體，不寫進資料庫 */
 export class History {
-  private done: Command[] = [];
-  private undone: Command[] = [];
+  private readonly done: Command[] = [];
+  private readonly undone: Command[] = [];
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly limit = 100) {}
+
+  /** 執行新動作（與 undo/redo 排在同一個佇列）並記錄 */
+  execute(cmd: Command): Promise<void> {
+    const next = this.queue.then(async () => {
+      await cmd.redo();
+      this.push(cmd);
+    });
+    this.queue = next.catch(() => {});
+    return next;
+  }
 
   /** 記錄一個「已經執行過」的動作 */
   push(cmd: Command): void {
     this.done.push(cmd);
     if (this.done.length > this.limit) this.done.shift();
-    this.undone = [];
+    this.undone.length = 0; // 就地清空：排隊中的 undo/redo 持有同一個陣列
   }
 
   get canUndo(): boolean {

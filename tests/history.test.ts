@@ -63,6 +63,24 @@ describe('History', () => {
     expect(maxRunning).toBe(1);
   });
 
+  it('execute 與 undo 依序執行：畫完立刻 undo 不會讓筆畫復活', async () => {
+    const h = new History();
+    const db = new Set<string>();
+    const add: Command = {
+      pageId: 'p',
+      redo: async () => {
+        await new Promise((r) => setTimeout(r, 10));
+        db.add('s');
+      },
+      undo: async () => void db.delete('s'),
+    };
+    const exec = h.execute(add);
+    const undo = h.undo();
+    await Promise.all([exec, undo]);
+    expect(db.has('s')).toBe(false);
+    expect(h.canRedo).toBe(true);
+  });
+
   it('執行失敗時命令留在原處，後續操作仍可進行', async () => {
     const h = new History();
     h.push({ pageId: 'x', undo: () => Promise.reject(new Error('db')), redo: async () => {} });

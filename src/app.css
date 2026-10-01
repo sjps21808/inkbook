@@ -13,6 +13,7 @@ html, body {
 .topbar {
   position: sticky;
   top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   height: 52px;
@@ -27,14 +28,10 @@ html, body {
   font-size: 20px;
 }
 
-.library {
-  padding: 24px 16px;
-}
-
 .version {
+  margin-left: 12px;
   color: #aeaeb2;
   font-size: 12px;
-  text-align: center;
 }
 
 .empty {
@@ -51,4 +48,33 @@ html, body {
   background: #0a84ff;
   border: none;
   border-radius: 8px;
+}
+
+.editor {
+  padding: 16px 16px 120px;
+}
+
+.page {
+  position: relative;
+  width: min(100%, 900px);
+  margin: 0 auto;
+  aspect-ratio: 595 / 842;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+  /* 手指：原生捲動與縮放（不含雙擊放大）；筆由 JS 處理 */
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+.page canvas,
+.page .overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 螢光筆與底下的模板／PDF 相乘混合 */
+.page canvas.ink,
+.page canvas.live {
+  mix-blend-mode: multiply;
 }
