@@ -3,6 +3,7 @@ import { PAGE_HEIGHT, PAGE_WIDTH, type PageElement, type StrokeElement, type Tem
 import { drawStroke, renderInk } from './stroke';
 import { drawTemplate } from './templates';
 import type { ToolDef } from './tools';
+import { SELECTION_PAD_PX, selectionBounds } from './tools/lasso';
 import type { Point, ToolContext, ToolSession } from './tools/types';
 
 /** canvas 單邊像素上限（4GB RAM iPad 的記憶體考量） */
@@ -29,6 +30,9 @@ interface Props {
   /** 目前工具的選項 id */
   option: string | undefined;
   onCommit(added: PageElement[], removed: PageElement[]): Promise<void>;
+  /** 這一頁選取中的 element id */
+  selection: string[];
+  onSelect(ids: string[]): void;
 }
 
 /** Safari 專有：Apple Pencil 的 touch 為 'stylus' */
@@ -185,6 +189,8 @@ export function PageCanvas(props: Props) {
           draw(ctx);
           ctx.restore();
         },
+        selection: p.selection,
+        select: (ids) => propsRef.current.onSelect(ids),
         commit(added, removed) {
           const seq = previewSeq;
           void propsRef.current.onCommit(added, removed).finally(() => {
@@ -270,12 +276,34 @@ export function PageCanvas(props: Props) {
     };
   }, []);
 
+  const box = props.selection.length ? selectionBounds(shown ?? [], props.selection) : null;
+
   return (
     <div class="page" ref={pageRef} data-index={index} data-ready={elements ? '' : undefined}>
       <canvas class="bg" ref={bgRef} />
       <canvas class="ink" ref={inkRef} />
       <canvas class="live" ref={liveRef} />
-      <div class="overlay" />
+      <div class="overlay">{box && <SelectionBox box={box} />}</div>
+    </div>
+  );
+}
+
+const pct = (v: number, total: number) => `${(v / total) * 100}%`;
+
+/** 選取框（外擴 SELECTION_PAD_PX）與右下角的縮放把手 */
+function SelectionBox({ box }: { box: { x: number; y: number; w: number; h: number } }) {
+  const pad = `${SELECTION_PAD_PX}px`;
+  return (
+    <div
+      class="selection"
+      style={{
+        left: `calc(${pct(box.x, PAGE_WIDTH)} - ${pad})`,
+        top: `calc(${pct(box.y, PAGE_HEIGHT)} - ${pad})`,
+        width: `calc(${pct(box.w, PAGE_WIDTH)} + 2 * ${pad})`,
+        height: `calc(${pct(box.h, PAGE_HEIGHT)} + 2 * ${pad})`,
+      }}
+    >
+      <div class="handle" />
     </div>
   );
 }

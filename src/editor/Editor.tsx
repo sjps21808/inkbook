@@ -12,7 +12,8 @@ import {
   restorePage,
   type PageSnapshot,
 } from '../db/repo';
-import type { Notebook, Page, PageElement, StrokeElement, Template } from '../db/schema';
+import type { Notebook, Page, PageElement, StrokeElement, Template, TextElement } from '../db/schema';
+import { transformElement } from './geometry';
 import { elementsCommand, History, type Command, type ElementStore } from './history';
 import { PageActions } from './PageActions';
 import type { NewStroke, PenSettings } from './PageCanvas';
@@ -53,6 +54,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     options: {},
   });
   const tool = tools.find((t) => t.id === toolState.toolId)!;
+  const [selection, setSelection] = useState<{ pageId: string; ids: string[] } | null>(null);
   const pen: PenSettings = { tool: tool.stroke, color: toolState.color, width: tool.widths[toolState.widthIdx] };
 
   const bump = (pageIds: Iterable<string>) =>
@@ -129,6 +131,39 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     return history.execute(elementsCommand(store, pageId, added, removed)).finally(refresh);
   };
 
+  const selected = () => {
+    if (!selection) return [];
+    const ids = new Set(selection.ids);
+    return (cacheRef.current[selection.pageId] ?? []).filter((e) => ids.has(e.id));
+  };
+
+  const onToolChange = (s: ToolState) => {
+    if (s.toolId !== toolState.toolId) setSelection(null);
+    else if (s.color !== toolState.color && selection) {
+      // 有選取時點顏色 = 改選取內容的顏色
+      const before = selected().filter((e): e is StrokeElement | TextElement => e.type !== 'image');
+      if (before.length) void onCommit(selection.pageId, before.map((e) => ({ ...e, color: s.color })), before);
+    }
+    setToolState(s);
+  };
+
+  const duplicateSelection = () => {
+    if (!selection) return;
+    const { pageId } = selection;
+    let z = (cacheRef.current[pageId] ?? []).reduce((m, e) => Math.max(m, e.z), -1) + 1;
+    const copies = selected()
+      .sort((a, b) => a.z - b.z)
+      .map((e) => transformElement({ ...e, id: newId(), z: z++ }, { s: 1, ox: 0, oy: 0, dx: 20, dy: 20 }));
+    void onCommit(pageId, copies, []);
+    setSelection({ pageId, ids: copies.map((e) => e.id) });
+  };
+
+  const deleteSelection = () => {
+    if (!selection) return;
+    void onCommit(selection.pageId, [], selected());
+    setSelection(null);
+  };
+
   const addPageCommand = (index: number, template: Template): Command => {
     let page: Page | null = null;
     const cmd: Command = {
@@ -190,6 +225,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
 
   /** 執行（或 undo/redo）後捲到受影響的頁面 */
   const run = (task: () => Promise<Command | undefined>) => {
+    setSelection(null);
     void task()
       .then(async (cmd) => {
         if (!cmd) return;
@@ -206,12 +242,18 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         title={notebook.title}
         onBack={onBack}
         state={toolState}
-        onChange={setToolState}
+        onChange={onToolChange}
         canUndo={history.canUndo}
         canRedo={history.canRedo}
         onUndo={() => run(() => history.undo())}
         onRedo={() => run(() => history.redo())}
       >
+        {selection && selection.ids.length > 0 && (
+          <div class="group" aria-label="選取">
+            <button onClick={duplicateSelection}>複製選取</button>
+            <button onClick={deleteSelection}>刪除選取</button>
+          </div>
+        )}
         <div class="group">
           <button aria-pressed={showThumbs} onClick={() => setShowThumbs((s) => !s)}>
             頁面
@@ -245,6 +287,8 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         tool={tool}
         option={toolOption(toolState, tool)}
         onCommit={onCommit}
+        selection={selection}
+        onSelect={(pageId, ids) => setSelection(ids.length ? { pageId, ids } : null)}
       />
     </div>
   );

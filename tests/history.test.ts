@@ -115,4 +115,17 @@ describe('elementsCommand', () => {
     await c.redo();
     expect(calls).toEqual(['remove a1,a2', 'add orig', 'remove orig', 'add a1,a2']);
   });
+
+  it('修改（移動、改色）：同 id 直接覆寫，不先刪除', async () => {
+    const calls: string[] = [];
+    const store: ElementStore = {
+      add: async (els) => void calls.push(`add ${els.map((e) => (e as { v?: number }).v)}`),
+      remove: async (els) => void calls.push(`remove ${els.map((e) => e.id)}`),
+    };
+    const v = (n: number) => ({ id: 'x', pageId: 'p', v: n }) as unknown as StrokeElement;
+    const c = elementsCommand(store, 'p', [v(2)], [v(1)]);
+    await c.redo();
+    await c.undo();
+    expect(calls).toEqual(['add 2', 'add 1']);
+  });
 });

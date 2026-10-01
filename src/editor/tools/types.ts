@@ -25,6 +25,9 @@ export interface ToolContext {
   drawLive(draw: ((ctx: CanvasRenderingContext2D) => void) | null): void;
   /** 寫入一個可以 undo 的動作（預覽在寫入完成後自動清除） */
   commit(added: PageElement[], removed: PageElement[]): void;
+  /** 這一頁目前選取的 element id */
+  selection: string[];
+  select(ids: string[]): void;
 }
 
 /** 一次筆的拖曳（pointerdown → pointerup） */

@@ -302,3 +302,21 @@ textarea,
   touch-action: none;
   cursor: grab;
 }
+
+.overlay .selection {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px dashed #0a84ff;
+  pointer-events: none;
+}
+
+.overlay .selection .handle {
+  position: absolute;
+  right: -9px;
+  bottom: -9px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border: 2px solid #0a84ff;
+  border-radius: 50%;
+}

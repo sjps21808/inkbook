@@ -25,17 +25,22 @@ interface Props {
   tool: ToolDef;
   option: string | undefined;
   onCommit(pageId: string, added: PageElement[], removed: PageElement[]): Promise<void>;
+  selection: { pageId: string; ids: string[] } | null;
+  onSelect(pageId: string, ids: string[]): void;
   handle: Ref<PageListHandle>;
 }
 
 const px = (v: number) => `${v}px`;
+
+const NONE: string[] = [];
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** 工具列下緣（捲動定位時要避開） */
 const stickyBottom = () => document.querySelector('.toolbar')?.getBoundingClientRect().bottom ?? 0;
 
-export function PageList({ pages, elementsOf, load, pen, onStroke, tool, option, onCommit, handle }: Props) {
+export function PageList(props: Props) {
+  const { pages, elementsOf, load, pen, onStroke, tool, option, onCommit, selection, onSelect, handle } = props;
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [range, setRange] = useState<[number, number]>([0, -1]);
@@ -127,6 +132,8 @@ export function PageList({ pages, elementsOf, load, pen, onStroke, tool, option,
                 tool={tool}
                 option={option}
                 onCommit={(added, removed) => onCommit(p.id, added, removed)}
+                selection={selection?.pageId === p.id ? selection.ids : NONE}
+                onSelect={(ids) => onSelect(p.id, ids)}
               />
             </div>
           );

@@ -1,5 +1,6 @@
 import type { StrokeElement } from '../../db/schema';
 import { eraserSession } from './eraser';
+import { lassoSession } from './lasso';
 import type { Point, ToolContext, ToolSession } from './types';
 
 /** 工具列由這個陣列產生；新增工具時在陣列尾端加一項（CLAUDE.md §6） */
@@ -20,6 +21,7 @@ export const tools: ToolDef[] = [
   { id: 'highlighter', label: '螢光筆', stroke: 'highlighter', widths: [8, 14, 20] },
   // widths = 橡皮擦半徑
   { id: 'eraser', label: '橡皮擦', stroke: 'pen', widths: [4, 10, 20], pointer: eraserSession, options: [{ id: 'partial', label: '局部' }, { id: 'whole', label: '整筆' }] },
+  { id: 'lasso', label: '套索', stroke: 'pen', widths: [1, 1, 1], pointer: lassoSession },
 ];
 
 export const COLORS: { name: string; value: string }[] = [

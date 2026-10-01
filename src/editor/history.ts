@@ -74,21 +74,30 @@ export interface ElementStore {
   remove(els: PageElement[]): Promise<void>;
 }
 
-/** 新增／移除 element 的動作（畫一筆 = added；M6 局部擦除 = removed 原筆 + added 碎片） */
+/**
+ * 新增／移除 element 的動作（畫一筆 = added；M6 局部擦除 = removed 原筆 + added 碎片）。
+ * 兩邊 id 相同的 element 視為修改（移動、改色），直接覆寫而不先刪除。
+ */
 export function elementsCommand(
   store: ElementStore,
   pageId: string,
   added: PageElement[],
   removed: PageElement[] = [],
 ): Command {
+  const without = (els: PageElement[], other: PageElement[]) => {
+    const ids = new Set(other.map((e) => e.id));
+    return els.filter((e) => !ids.has(e.id));
+  };
+  const onlyAdded = without(added, removed);
+  const onlyRemoved = without(removed, added);
   return {
     pageId,
     async undo() {
-      if (added.length) await store.remove(added);
+      if (onlyAdded.length) await store.remove(onlyAdded);
       if (removed.length) await store.add(removed);
     },
     async redo() {
-      if (removed.length) await store.remove(removed);
+      if (onlyRemoved.length) await store.remove(onlyRemoved);
       if (added.length) await store.add(added);
     },
   };
