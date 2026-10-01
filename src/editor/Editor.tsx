@@ -59,7 +59,7 @@ export function Editor({ db, page, initialElements }: Props) {
         onUndo={() => void history.undo().finally(refresh)}
         onRedo={() => void history.redo().finally(refresh)}
       />
-      <PageCanvas elements={elements} pen={pen} onStroke={onStroke} />
+      <PageCanvas template={page.template} elements={elements} pen={pen} onStroke={onStroke} />
     </div>
   );
 }

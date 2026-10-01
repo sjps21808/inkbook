@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
-import { PAGE_HEIGHT, PAGE_WIDTH, type PageElement, type StrokeElement } from '../db/schema';
+import { PAGE_HEIGHT, PAGE_WIDTH, type PageElement, type StrokeElement, type Template } from '../db/schema';
 import { drawStroke, renderInk } from './stroke';
+import { drawTemplate } from './templates';
 
 /** canvas 單邊像素上限（4GB RAM iPad 的記憶體考量） */
 const MAX_CANVAS_PX = 4096;
@@ -14,6 +15,7 @@ export interface PenSettings {
 export type NewStroke = Pick<StrokeElement, 'tool' | 'color' | 'width' | 'points'>;
 
 interface Props {
+  template: Template;
   elements: PageElement[];
   pen: PenSettings;
   onStroke(s: NewStroke): void;
@@ -25,7 +27,7 @@ type SafariTouch = Touch & { touchType?: 'direct' | 'stylus' };
 const isDrawPointer = (e: PointerEvent) =>
   e.pointerType === 'pen' || (import.meta.env.DEV && e.pointerType === 'mouse');
 
-export function PageCanvas({ elements, pen, onStroke }: Props) {
+export function PageCanvas({ template, elements, pen, onStroke }: Props) {
   const pageRef = useRef<HTMLDivElement>(null);
   const bgRef = useRef<HTMLCanvasElement>(null);
   const inkRef = useRef<HTMLCanvasElement>(null);
@@ -33,6 +35,8 @@ export function PageCanvas({ elements, pen, onStroke }: Props) {
   const scaleRef = useRef(1);
   const elementsRef = useRef(elements);
   elementsRef.current = elements;
+  const templateRef = useRef(template);
+  templateRef.current = template;
   const penRef = useRef(pen);
   penRef.current = pen;
   const onStrokeRef = useRef(onStroke);
@@ -60,9 +64,7 @@ export function PageCanvas({ elements, pen, onStroke }: Props) {
         }
       }
       scaleRef.current = w / PAGE_WIDTH;
-      const bg = bgRef.current!.getContext('2d')!;
-      bg.fillStyle = '#ffffff';
-      bg.fillRect(0, 0, w, h);
+      drawTemplate(bgRef.current!.getContext('2d')!, templateRef.current, scaleRef.current);
       paintInk();
     };
     const ro = new ResizeObserver(resize);
