@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { defineConfig, type Plugin } from 'vitest/config';
 import preact from '@preact/preset-vite';
@@ -7,16 +8,40 @@ import { VitePWA } from 'vite-plugin-pwa';
 const require = createRequire(import.meta.url);
 const { version } = require('./package.json') as { version: string };
 
-// pdf.js worker 以固定檔名輸出到 dist，讓 service worker 預先快取（M5 用 BASE_URL + 檔名載入）
+// pdf.js 的 worker 與資源以固定路徑輸出到 dist，讓 service worker 預先快取（離線也能匯入與顯示 PDF）
+const PDFJS = dirname(require.resolve('pdfjs-dist/package.json'));
+const PDFJS_DIRS = ['cmaps', 'standard_fonts', 'wasm', 'iccs'];
+// wasm 目錄只要解碼器本身；quickjs 是 PDF 內嵌 JS 用的，不需要
+const skip = (dir: string, f: string) => dir === 'wasm' && (f.startsWith('quickjs') || f.endsWith('.js'));
+
+/** [輸出路徑（相對 base）, 來源檔案] */
+function pdfAssets(): [string, string][] {
+  const list: [string, string][] = [['pdf.worker.min.mjs', join(PDFJS, 'build/pdf.worker.min.mjs')]];
+  for (const dir of PDFJS_DIRS) {
+    for (const f of readdirSync(join(PDFJS, dir))) {
+      if (!skip(dir, f)) list.push([`pdfjs/${dir}/${f}`, join(PDFJS, dir, f)]);
+    }
+  }
+  return list;
+}
+
 function pdfWorker(): Plugin {
   return {
     name: 'inkbook-pdf-worker',
-    apply: 'build',
     generateBundle() {
-      this.emitFile({
-        type: 'asset',
-        fileName: 'pdf.worker.min.mjs',
-        source: readFileSync(require.resolve('pdfjs-dist/build/pdf.worker.min.mjs')),
+      for (const [fileName, src] of pdfAssets()) {
+        this.emitFile({ type: 'asset', fileName, source: readFileSync(src) });
+      }
+    },
+    // dev server 也提供同樣的路徑
+    configureServer(server) {
+      const files = new Map(pdfAssets().map(([name, src]) => [`/inkbook/${name}`, src]));
+      server.middlewares.use((req, res, next) => {
+        const src = files.get((req.url ?? '').split('?')[0]);
+        if (!src) return next();
+        const type = src.endsWith('.mjs') ? 'text/javascript' : src.endsWith('.wasm') ? 'application/wasm' : '';
+        if (type) res.setHeader('Content-Type', type);
+        res.end(readFileSync(src));
       });
     },
   };
@@ -25,7 +50,7 @@ function pdfWorker(): Plugin {
 // CSP（GitHub Pages 無法設定 header，用 meta）；只在 build 加入，避免干擾 dev server 的 HMR
 const CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'", // pdf.js 的 wasm 解碼器（2026-10-01 使用者同意）
   "style-src 'self' 'unsafe-inline'", // eruda 會插入 <style>
   "img-src 'self' blob:",
   "worker-src 'self' blob:", // pdf.js worker
@@ -72,7 +97,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,mjs,css,html,png,svg,ttf,txt}'],
+        globPatterns: ['**/*.{js,mjs,css,html,png,svg,ttf,txt,bcmap,pfb,wasm,icc}'],
         maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
       },
     }),
