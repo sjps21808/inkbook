@@ -20,11 +20,14 @@ interface Props {
   canRedo: boolean;
   onUndo(): void;
   onRedo(): void;
+  /** 點一次性動作的工具（例如圖片） */
+  onAction(tool: ToolDef): void;
   /** 工具列尾端的其他按鈕（頁面操作） */
   children?: ComponentChildren;
 }
 
-export function Toolbar({ title, onBack, state, onChange, canUndo, canRedo, onUndo, onRedo, children }: Props) {
+export function Toolbar(props: Props) {
+  const { title, onBack, state, onChange, canUndo, canRedo, onUndo, onRedo, onAction, children } = props;
   const active = tools.find((t) => t.id === state.toolId)!;
   return (
     <div class="toolbar" role="toolbar" aria-label="工具列">
@@ -36,8 +39,8 @@ export function Toolbar({ title, onBack, state, onChange, canUndo, canRedo, onUn
         {tools.map((t) => (
           <button
             key={t.id}
-            aria-pressed={state.toolId === t.id}
-            onClick={() => onChange({ ...state, toolId: t.id })}
+            aria-pressed={t.action ? undefined : state.toolId === t.id}
+            onClick={() => (t.action ? onAction(t) : onChange({ ...state, toolId: t.id }))}
           >
             {t.label}
           </button>

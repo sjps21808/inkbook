@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { InkDatabase } from '../db/db';
 import { listElements } from '../db/repo';
 import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement, type Template } from '../db/schema';
+import type { ImageCache } from './images';
 import { renderInk } from './stroke';
 import { drawTemplate } from './templates';
 
@@ -13,6 +14,7 @@ const EDGE = 40;
 
 interface Props {
   db: InkDatabase;
+  images: ImageCache;
   pages: Page[];
   elementsOf(pageId: string): PageElement[] | undefined;
   /** 頁面內容的版本；變動時重新產生縮圖 */
@@ -23,7 +25,17 @@ interface Props {
 
 const px = (v: number) => `${v}px`;
 
-async function renderThumb(template: Template, els: PageElement[]): Promise<string> {
+async function renderThumb(template: Template, els: PageElement[], images: ImageCache): Promise<string> {
+  const bitmaps = new Map<string, ImageBitmap>();
+  for (const e of els) {
+    if (e.type === 'image') {
+      try {
+        bitmaps.set(e.blobId, await images.load(e.blobId));
+      } catch {
+        // 讀不到的圖片略過
+      }
+    }
+  }
   const scale = (THUMB_W * 2) / PAGE_WIDTH;
   const make = () => {
     const cv = document.createElement('canvas');
@@ -35,7 +47,7 @@ async function renderThumb(template: Template, els: PageElement[]): Promise<stri
   const ink = make();
   const ctx = bg.getContext('2d')!;
   drawTemplate(ctx, template, scale);
-  renderInk(ink.getContext('2d')!, els, scale);
+  renderInk(ink.getContext('2d')!, els, scale, (id) => bitmaps.get(id));
   ctx.globalCompositeOperation = 'multiply';
   ctx.drawImage(ink, 0, 0);
   const blob = await new Promise<Blob | null>((r) => bg.toBlob(r));
@@ -43,7 +55,7 @@ async function renderThumb(template: Template, els: PageElement[]): Promise<stri
   return URL.createObjectURL(blob!);
 }
 
-export function Thumbnails({ db, pages, elementsOf, versions, onJump, onReorder }: Props) {
+export function Thumbnails({ db, images, pages, elementsOf, versions, onJump, onReorder }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const urls = useRef(new Map<string, { url: string; v: number }>());
   const pending = useRef(new Set<string>());
@@ -65,7 +77,7 @@ export function Thumbnails({ db, pages, elementsOf, versions, onJump, onReorder 
     queue.current = queue.current
       .then(async () => {
         const els = latest.current.elementsOf(pageId) ?? (await listElements(db, pageId));
-        const url = await renderThumb(page.template, els);
+        const url = await renderThumb(page.template, els, images);
         const old = urls.current.get(pageId);
         if (old) URL.revokeObjectURL(old.url);
         urls.current.set(pageId, { url, v });

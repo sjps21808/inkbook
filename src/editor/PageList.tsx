@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } fro
 import type { Ref } from 'preact';
 import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement } from '../db/schema';
 import { PageCanvas, type NewStroke, type PenSettings } from './PageCanvas';
+import type { ImageCache } from './images';
 import type { ToolDef } from './tools';
 
 const GAP = 16;
@@ -20,6 +21,7 @@ interface Props {
   pages: Page[];
   elementsOf(pageId: string): PageElement[] | undefined;
   load(pageId: string): void;
+  images: ImageCache;
   pen: PenSettings;
   onStroke(pageId: string, s: NewStroke): void;
   tool: ToolDef;
@@ -40,7 +42,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const stickyBottom = () => document.querySelector('.toolbar')?.getBoundingClientRect().bottom ?? 0;
 
 export function PageList(props: Props) {
-  const { pages, elementsOf, load, pen, onStroke, tool, option, onCommit, selection, onSelect, handle } = props;
+  const { pages, elementsOf, load, images, pen, onStroke, tool, option, onCommit, selection, onSelect, handle } = props;
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [range, setRange] = useState<[number, number]>([0, -1]);
@@ -125,6 +127,7 @@ export function PageList(props: Props) {
               <PageCanvas
                 index={i}
                 pageId={p.id}
+                images={images}
                 template={p.template}
                 elements={elementsOf(p.id)}
                 pen={pen}

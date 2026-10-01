@@ -14,13 +14,14 @@ import {
 } from '../db/repo';
 import type { Notebook, Page, PageElement, StrokeElement, Template, TextElement } from '../db/schema';
 import { transformElement } from './geometry';
+import { ImageCache } from './images';
 import { elementsCommand, History, type Command, type ElementStore } from './history';
 import { PageActions } from './PageActions';
 import type { NewStroke, PenSettings } from './PageCanvas';
 import { PageList, type PageListHandle } from './PageList';
 import { Thumbnails } from './Thumbnails';
 import { Toolbar, toolOption, type ToolState } from './Toolbar';
-import { COLORS, tools } from './tools';
+import { COLORS, tools, type ToolDef } from './tools';
 
 interface Props {
   db: InkDatabase;
@@ -45,6 +46,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   const loading = useRef(new Set<string>());
   const listRef = useRef<PageListHandle>(null);
   const history = useMemo(() => new History(), []);
+  const images = useMemo(() => new ImageCache(db), [db]);
   const [, rerender] = useState(0);
   const refresh = () => rerender((n) => n + 1);
   const [toolState, setToolState] = useState<ToolState>({
@@ -158,6 +160,21 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     setSelection({ pageId, ids: copies.map((e) => e.id) });
   };
 
+  /** 一次性動作（圖片）：插入到畫面中間那一頁，然後用套索選取 */
+  const onAction = (t: ToolDef) => {
+    const pageId = pages[listRef.current?.currentIndex() ?? 0].id;
+    t.action!({
+      db,
+      pageId,
+      nextZ: (cacheRef.current[pageId] ?? []).reduce((m, e) => Math.max(m, e.z), -1) + 1,
+      insert(els) {
+        void onCommit(pageId, els, []);
+        setToolState((s) => ({ ...s, toolId: 'lasso' }));
+        setSelection({ pageId, ids: els.map((e) => e.id) });
+      },
+    });
+  };
+
   const deleteSelection = () => {
     if (!selection) return;
     void onCommit(selection.pageId, [], selected());
@@ -247,6 +264,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         canRedo={history.canRedo}
         onUndo={() => run(() => history.undo())}
         onRedo={() => run(() => history.redo())}
+        onAction={onAction}
       >
         {selection && selection.ids.length > 0 && (
           <div class="group" aria-label="選取">
@@ -270,6 +288,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
       {showThumbs && (
         <Thumbnails
           db={db}
+          images={images}
           pages={pages}
           elementsOf={(id) => cache[id]}
           versions={versions}
@@ -282,6 +301,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         pages={pages}
         elementsOf={(id) => cache[id]}
         load={load}
+        images={images}
         pen={pen}
         onStroke={onStroke}
         tool={tool}

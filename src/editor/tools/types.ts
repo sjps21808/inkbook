@@ -1,3 +1,4 @@
+import type { InkDatabase } from '../../db/db';
 import type { PageElement } from '../../db/schema';
 
 /** 頁面座標（pt） */
@@ -28,6 +29,17 @@ export interface ToolContext {
   /** 這一頁目前選取的 element id */
   selection: string[];
   select(ids: string[]): void;
+}
+
+/** 一次性動作（點工具按鈕時執行）能使用的功能 */
+export interface ActionContext {
+  db: InkDatabase;
+  /** 畫面中間的那一頁 */
+  pageId: string;
+  /** 該頁下一個可用的 z */
+  nextZ: number;
+  /** 新增 element（可以 undo），並切換到套索選取它們 */
+  insert(els: PageElement[]): void;
 }
 
 /** 一次筆的拖曳（pointerdown → pointerup） */

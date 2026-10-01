@@ -1,5 +1,5 @@
 import { getStroke } from 'perfect-freehand';
-import type { PageElement, StrokeElement } from '../db/schema';
+import type { ImageElement, PageElement, StrokeElement } from '../db/schema';
 
 export const HIGHLIGHTER_ALPHA = 0.5;
 
@@ -55,14 +55,27 @@ export function drawStroke(ctx: CanvasRenderingContext2D, s: StrokeElement, scal
   ctx.restore();
 }
 
-/** 重畫整個 ink 圖層：螢光筆一律在最底層，其餘依 z 排序 */
-export function renderInk(ctx: CanvasRenderingContext2D, els: PageElement[], scale: number): void {
+/** 依 blobId 取得已解碼的圖片；還沒解碼時回傳 undefined（略過不畫） */
+export type ImageSource = (blobId: string) => CanvasImageSource | undefined;
+
+/** 重畫整個 ink 圖層：螢光筆一律在最底層，筆畫與圖片依 z 排序（文字在 overlay） */
+export function renderInk(ctx: CanvasRenderingContext2D, els: PageElement[], scale: number, image?: ImageSource): void {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.restore();
-  const strokes = els.filter((e): e is StrokeElement => e.type === 'stroke');
-  const rank = (s: StrokeElement) => (s.tool === 'highlighter' ? 0 : 1);
-  strokes.sort((a, b) => rank(a) - rank(b) || a.z - b.z);
-  for (const s of strokes) drawStroke(ctx, s, scale);
+  const drawn = els.filter((e): e is StrokeElement | ImageElement => e.type !== 'text');
+  const rank = (e: StrokeElement | ImageElement) => (e.type === 'stroke' && e.tool === 'highlighter' ? 0 : 1);
+  drawn.sort((a, b) => rank(a) - rank(b) || a.z - b.z);
+  for (const e of drawn) {
+    if (e.type === 'stroke') drawStroke(ctx, e, scale);
+    else {
+      const src = image?.(e.blobId);
+      if (!src) continue;
+      ctx.save();
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.drawImage(src, e.x, e.y, e.w, e.h);
+      ctx.restore();
+    }
+  }
 }

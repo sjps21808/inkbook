@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { PAGE_HEIGHT, PAGE_WIDTH, type PageElement, type StrokeElement, type Template } from '../db/schema';
+import type { ImageCache } from './images';
 import { drawStroke, renderInk } from './stroke';
 import { drawTemplate } from './templates';
 import type { ToolDef } from './tools';
@@ -20,6 +21,7 @@ export type NewStroke = Pick<StrokeElement, 'tool' | 'color' | 'width' | 'points
 interface Props {
   index: number;
   pageId: string;
+  images: ImageCache;
   template: Template;
   /** undefined = 還在載入（此時不能書寫） */
   elements: PageElement[] | undefined;
@@ -70,7 +72,16 @@ export function PageCanvas(props: Props) {
 
   const paintInk = () => {
     const ctx = inkRef.current?.getContext('2d');
-    if (ctx) renderInk(ctx, shownRef.current ?? [], scaleRef.current);
+    if (!ctx) return;
+    const els = shownRef.current ?? [];
+    const { images } = propsRef.current;
+    renderInk(ctx, els, scaleRef.current, (id) => images.peek(id));
+    // 還沒解碼的圖片：解碼完成後重畫
+    for (const e of els) {
+      if (e.type === 'image' && !images.peek(e.blobId)) {
+        images.load(e.blobId).then(() => inkRef.current && paintInk(), () => {});
+      }
+    }
   };
 
   // 依顯示大小調整 canvas 解析度；卸載時釋放 canvas 記憶體
