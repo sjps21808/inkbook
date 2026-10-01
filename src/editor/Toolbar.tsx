@@ -1,11 +1,15 @@
 import type { ComponentChildren } from 'preact';
-import { COLORS, tools, WIDTH_LABELS } from './tools';
+import { COLORS, tools, WIDTH_LABELS, type ToolDef } from './tools';
 
 export interface ToolState {
   toolId: string;
   color: string;
   widthIdx: number;
+  /** 各工具選擇的選項 id（沒選過 = 第一項） */
+  options: Record<string, string>;
 }
+
+export const toolOption = (s: ToolState, tool: ToolDef) => s.options[tool.id] ?? tool.options?.[0].id;
 
 interface Props {
   title: string;
@@ -21,6 +25,7 @@ interface Props {
 }
 
 export function Toolbar({ title, onBack, state, onChange, canUndo, canRedo, onUndo, onRedo, children }: Props) {
+  const active = tools.find((t) => t.id === state.toolId)!;
   return (
     <div class="toolbar" role="toolbar" aria-label="工具列">
       <div class="group">
@@ -38,6 +43,19 @@ export function Toolbar({ title, onBack, state, onChange, canUndo, canRedo, onUn
           </button>
         ))}
       </div>
+      {active.options && (
+        <div class="group" aria-label={`${active.label}選項`}>
+          {active.options.map((o) => (
+            <button
+              key={o.id}
+              aria-pressed={toolOption(state, active) === o.id}
+              onClick={() => onChange({ ...state, options: { ...state.options, [active.id]: o.id } })}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div class="group">
         {COLORS.map((c) => (
           <button

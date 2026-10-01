@@ -1,4 +1,6 @@
 import type { StrokeElement } from '../../db/schema';
+import { eraserSession } from './eraser';
+import type { Point, ToolContext, ToolSession } from './types';
 
 /** 工具列由這個陣列產生；新增工具時在陣列尾端加一項（CLAUDE.md §6） */
 export interface ToolDef {
@@ -7,11 +9,17 @@ export interface ToolDef {
   stroke: StrokeElement['tool'];
   /** 細／中／粗（pt） */
   widths: [number, number, number];
+  /** 有設定時，筆在頁面上的輸入交給這個工具處理（不畫筆畫）；回傳 undefined 表示忽略這次輸入 */
+  pointer?(ctx: ToolContext, at: Point): ToolSession | undefined;
+  /** 工具選項（例如橡皮擦的局部／整筆）；第一項為預設 */
+  options?: { id: string; label: string }[];
 }
 
 export const tools: ToolDef[] = [
   { id: 'pen', label: '筆', stroke: 'pen', widths: [1.5, 3, 5] },
   { id: 'highlighter', label: '螢光筆', stroke: 'highlighter', widths: [8, 14, 20] },
+  // widths = 橡皮擦半徑
+  { id: 'eraser', label: '橡皮擦', stroke: 'pen', widths: [4, 10, 20], pointer: eraserSession, options: [{ id: 'partial', label: '局部' }, { id: 'whole', label: '整筆' }] },
 ];
 
 export const COLORS: { name: string; value: string }[] = [

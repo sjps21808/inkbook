@@ -18,7 +18,7 @@ import { PageActions } from './PageActions';
 import type { NewStroke, PenSettings } from './PageCanvas';
 import { PageList, type PageListHandle } from './PageList';
 import { Thumbnails } from './Thumbnails';
-import { Toolbar, type ToolState } from './Toolbar';
+import { Toolbar, toolOption, type ToolState } from './Toolbar';
 import { COLORS, tools } from './tools';
 
 interface Props {
@@ -46,7 +46,12 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   const history = useMemo(() => new History(), []);
   const [, rerender] = useState(0);
   const refresh = () => rerender((n) => n + 1);
-  const [toolState, setToolState] = useState<ToolState>({ toolId: 'pen', color: COLORS[0].value, widthIdx: 1 });
+  const [toolState, setToolState] = useState<ToolState>({
+    toolId: 'pen',
+    color: COLORS[0].value,
+    widthIdx: 1,
+    options: {},
+  });
   const tool = tools.find((t) => t.id === toolState.toolId)!;
   const pen: PenSettings = { tool: tool.stroke, color: toolState.color, width: tool.widths[toolState.widthIdx] };
 
@@ -114,6 +119,14 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     // 先放進 ref（畫面在 execute 裡更新），下一筆的 z 才會正確
     cacheRef.current = { ...cacheRef.current, [pageId]: [...cur, el] };
     void history.execute(elementsCommand(store, pageId, [el])).finally(refresh);
+  };
+
+  /** 工具（橡皮擦等）完成一次操作 */
+  const onCommit = (pageId: string, added: PageElement[], removed: PageElement[]) => {
+    const gone = new Set(removed.map((e) => e.id));
+    const cur = (cacheRef.current[pageId] ?? []).filter((e) => !gone.has(e.id));
+    cacheRef.current = { ...cacheRef.current, [pageId]: [...cur, ...added] };
+    return history.execute(elementsCommand(store, pageId, added, removed)).finally(refresh);
   };
 
   const addPageCommand = (index: number, template: Template): Command => {
@@ -229,6 +242,9 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         load={load}
         pen={pen}
         onStroke={onStroke}
+        tool={tool}
+        option={toolOption(toolState, tool)}
+        onCommit={onCommit}
       />
     </div>
   );

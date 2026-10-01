@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } fro
 import type { Ref } from 'preact';
 import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement } from '../db/schema';
 import { PageCanvas, type NewStroke, type PenSettings } from './PageCanvas';
+import type { ToolDef } from './tools';
 
 const GAP = 16;
 const MAX_PAGE_WIDTH = 900;
@@ -21,6 +22,9 @@ interface Props {
   load(pageId: string): void;
   pen: PenSettings;
   onStroke(pageId: string, s: NewStroke): void;
+  tool: ToolDef;
+  option: string | undefined;
+  onCommit(pageId: string, added: PageElement[], removed: PageElement[]): Promise<void>;
   handle: Ref<PageListHandle>;
 }
 
@@ -31,7 +35,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 /** 工具列下緣（捲動定位時要避開） */
 const stickyBottom = () => document.querySelector('.toolbar')?.getBoundingClientRect().bottom ?? 0;
 
-export function PageList({ pages, elementsOf, load, pen, onStroke, handle }: Props) {
+export function PageList({ pages, elementsOf, load, pen, onStroke, tool, option, onCommit, handle }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [range, setRange] = useState<[number, number]>([0, -1]);
@@ -115,10 +119,14 @@ export function PageList({ pages, elementsOf, load, pen, onStroke, handle }: Pro
             <div key={p.id} class="page-slot" style={{ top: px(i * stride), width: px(pageW), height: px(pageH) }}>
               <PageCanvas
                 index={i}
+                pageId={p.id}
                 template={p.template}
                 elements={elementsOf(p.id)}
                 pen={pen}
                 onStroke={(s) => onStroke(p.id, s)}
+                tool={tool}
+                option={option}
+                onCommit={(added, removed) => onCommit(p.id, added, removed)}
               />
             </div>
           );

@@ -1,7 +1,9 @@
-import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { PAGE_HEIGHT, PAGE_WIDTH, type PageElement, type StrokeElement, type Template } from '../db/schema';
 import { drawStroke, renderInk } from './stroke';
 import { drawTemplate } from './templates';
+import type { ToolDef } from './tools';
+import type { Point, ToolContext, ToolSession } from './tools/types';
 
 /** canvas 單邊像素上限（4GB RAM iPad 的記憶體考量） */
 const MAX_CANVAS_PX = 4096;
@@ -16,11 +18,17 @@ export type NewStroke = Pick<StrokeElement, 'tool' | 'color' | 'width' | 'points
 
 interface Props {
   index: number;
+  pageId: string;
   template: Template;
   /** undefined = 還在載入（此時不能書寫） */
   elements: PageElement[] | undefined;
   pen: PenSettings;
   onStroke(s: NewStroke): void;
+  /** 目前的工具（有 pointer 時由工具處理筆的輸入） */
+  tool: ToolDef;
+  /** 目前工具的選項 id */
+  option: string | undefined;
+  onCommit(added: PageElement[], removed: PageElement[]): Promise<void>;
 }
 
 /** Safari 專有：Apple Pencil 的 touch 為 'stylus' */
@@ -37,7 +45,8 @@ const release = (cv: HTMLCanvasElement) => {
   cv.height = 0;
 };
 
-export function PageCanvas({ index, template, elements, pen, onStroke }: Props) {
+export function PageCanvas(props: Props) {
+  const { index, template, elements } = props;
   const pageRef = useRef<HTMLDivElement>(null);
   const bgRef = useRef<HTMLCanvasElement>(null);
   const inkRef = useRef<HTMLCanvasElement>(null);
@@ -45,16 +54,19 @@ export function PageCanvas({ index, template, elements, pen, onStroke }: Props) 
   const scaleRef = useRef(1);
   const elementsRef = useRef(elements);
   elementsRef.current = elements;
+  // 工具操作中的暫時畫面（例如擦除中）
+  const [preview, setPreview] = useState<PageElement[] | null>(null);
+  const shown = preview ?? elements;
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
   const templateRef = useRef(template);
   templateRef.current = template;
-  const penRef = useRef(pen);
-  penRef.current = pen;
-  const onStrokeRef = useRef(onStroke);
-  onStrokeRef.current = onStroke;
+  const propsRef = useRef(props);
+  propsRef.current = props;
 
   const paintInk = () => {
     const ctx = inkRef.current?.getContext('2d');
-    if (ctx) renderInk(ctx, elementsRef.current ?? [], scaleRef.current);
+    if (ctx) renderInk(ctx, shownRef.current ?? [], scaleRef.current);
   };
 
   // 依顯示大小調整 canvas 解析度；卸載時釋放 canvas 記憶體
@@ -92,7 +104,7 @@ export function PageCanvas({ index, template, elements, pen, onStroke }: Props) 
     };
   }, []);
 
-  useEffect(paintInk, [elements]);
+  useEffect(paintInk, [shown]);
 
   // 輸入：pen 畫圖；touch 交給原生捲動與縮放
   // 用 layout effect 在繪製前掛上監聽，頁面一出現就能書寫
@@ -103,21 +115,28 @@ export function PageCanvas({ index, template, elements, pen, onStroke }: Props) 
     let pointerId: number | null = null;
     let pts: number[] = [];
     let raf = 0;
+    let session: ToolSession | null = null;
+    // 每次預覽遞增；寫入完成時只在之後沒有新預覽的情況下清除
+    let previewSeq = 0;
 
-    const toPage = (e: PointerEvent) => {
+    const toPoint = (e: PointerEvent): Point => {
       const r = page.getBoundingClientRect();
-      pts.push(
-        ((e.clientX - r.left) / r.width) * PAGE_WIDTH,
-        ((e.clientY - r.top) / r.height) * PAGE_HEIGHT,
-        e.pressure,
-      );
+      return {
+        x: ((e.clientX - r.left) / r.width) * PAGE_WIDTH,
+        y: ((e.clientY - r.top) / r.height) * PAGE_HEIGHT,
+        pressure: e.pressure,
+      };
+    };
+    const toPage = (e: PointerEvent) => {
+      const p = toPoint(e);
+      pts.push(p.x, p.y, p.pressure);
     };
     const current = (): StrokeElement => ({
       id: '',
       pageId: '',
       z: 0,
       type: 'stroke',
-      ...penRef.current,
+      ...propsRef.current.pen,
       points: Float32Array.from(pts),
     });
     const claimLive = () => {
@@ -144,6 +163,37 @@ export function PageCanvas({ index, template, elements, pen, onStroke }: Props) 
       if (!raf) raf = requestAnimationFrame(drawLive);
     };
 
+    const toolContext = (): ToolContext => {
+      const p = propsRef.current;
+      return {
+        pageId: p.pageId,
+        elements: elementsRef.current ?? [],
+        color: p.pen.color,
+        width: p.pen.width,
+        option: p.option,
+        ptPerPx: PAGE_WIDTH / page.getBoundingClientRect().width,
+        preview(els) {
+          previewSeq++;
+          setPreview(els);
+        },
+        drawLive(draw) {
+          clearLive();
+          if (!draw) return;
+          const ctx = live.getContext('2d')!;
+          ctx.save();
+          ctx.setTransform(scaleRef.current, 0, 0, scaleRef.current, 0, 0);
+          draw(ctx);
+          ctx.restore();
+        },
+        commit(added, removed) {
+          const seq = previewSeq;
+          void propsRef.current.onCommit(added, removed).finally(() => {
+            if (seq === previewSeq) setPreview(null);
+          });
+        },
+      };
+    };
+
     const down = (e: PointerEvent) => {
       if (!isDrawPointer(e)) return;
       e.preventDefault();
@@ -155,6 +205,12 @@ export function PageCanvas({ index, template, elements, pen, onStroke }: Props) 
         // 合成事件（測試）沒有對應的實體 pointer
       }
       claimLive();
+      const tool = propsRef.current.tool;
+      if (tool.pointer) {
+        session = tool.pointer(toolContext(), toPoint(e)) ?? null;
+        if (!session) pointerId = null;
+        return;
+      }
       pts = [];
       toPage(e);
       schedule();
@@ -163,11 +219,21 @@ export function PageCanvas({ index, template, elements, pen, onStroke }: Props) 
       if (e.pointerId !== pointerId) return;
       e.preventDefault();
       const evs = e.getCoalescedEvents?.() ?? [];
-      for (const ce of evs.length ? evs : [e]) toPage(ce);
-      schedule();
+      for (const ce of evs.length ? evs : [e]) {
+        if (session) session.move(toPoint(ce));
+        else toPage(ce);
+      }
+      if (!session) schedule();
     };
     const up = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return;
+      if (session) {
+        const s = session;
+        session = null;
+        pointerId = null;
+        s.up(toPoint(e));
+        return;
+      }
       const s = current();
       pointerId = null;
       cancelAnimationFrame(raf);
@@ -175,7 +241,7 @@ export function PageCanvas({ index, template, elements, pen, onStroke }: Props) 
       // 先把這一筆畫到 ink，避免存檔完成前閃爍
       drawStroke(ink.getContext('2d')!, s, scaleRef.current);
       clearLive();
-      onStrokeRef.current({ tool: s.tool, color: s.color, width: s.width, points: s.points });
+      propsRef.current.onStroke({ tool: s.tool, color: s.color, width: s.width, points: s.points });
     };
     // iOS：pointerdown 的 preventDefault 擋不住捲動；筆觸碰或書寫中（手掌）時擋掉 touch
     const touch = (e: TouchEvent) => {
