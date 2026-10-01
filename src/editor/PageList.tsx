@@ -9,7 +9,8 @@ const MAX_PAGE_WIDTH = 900;
 const BUFFER = 2;
 
 export interface PageListHandle {
-  scrollToPage(pageId: string): void;
+  /** 捲到 pageId；找不到時捲到 fallbackIndex */
+  scrollToPage(pageId: string, fallbackIndex?: number): void;
   /** 畫面中線所在的頁面 index */
   currentIndex(): number;
 }
@@ -86,8 +87,9 @@ export function PageList({ pages, elementsOf, load, pen, onStroke, handle }: Pro
   useImperativeHandle(
     handle,
     () => ({
-      scrollToPage(pageId) {
-        const i = pages.findIndex((p) => p.id === pageId);
+      scrollToPage(pageId, fallbackIndex) {
+        let i = pages.findIndex((p) => p.id === pageId);
+        if (i < 0 && fallbackIndex !== undefined) i = clamp(fallbackIndex, 0, n - 1);
         if (i < 0 || !stride) return;
         const top = ref.current!.getBoundingClientRect().top + i * stride;
         const visibleTop = stickyBottom();

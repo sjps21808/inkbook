@@ -136,3 +136,35 @@ export function mountedPages(page: Page) {
     [...document.querySelectorAll<HTMLElement>('.page')].map((p) => Number(p.dataset.index)),
   );
 }
+
+/** IndexedDB 裡的頁面數量 */
+export function pageCount(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const req = indexedDB.open('inkbook');
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => {
+          const db = req.result;
+          const c = db.transaction('pages').objectStore('pages').count();
+          c.onsuccess = () => {
+            resolve(c.result);
+            db.close();
+          };
+        };
+      }),
+  );
+}
+
+/** 讀取第 index 頁 bg 圖層（模板）的像素 [r, g, b, a]；座標單位 pt */
+export function bgPixel(page: Page, [x, y]: Pt, index = 0) {
+  return page.evaluate(
+    ({ x, y, index }) => {
+      const cv = document.querySelector<HTMLCanvasElement>(`.page[data-index="${index}"] canvas.bg`)!;
+      const k = cv.width / 595;
+      const d = cv.getContext('2d')!.getImageData(Math.floor(x * k), Math.floor(y * k), 1, 1).data;
+      return [d[0], d[1], d[2], d[3]];
+    },
+    { x, y, index },
+  );
+}

@@ -216,3 +216,33 @@ textarea,
   color: #8e8e93;
   font-size: 13px;
 }
+
+.page-actions {
+  position: relative;
+}
+
+.toolbar .popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  white-space: nowrap;
+  background: #fff;
+  border: 1px solid #d1d1d6;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.toolbar .popover [aria-current="true"] {
+  border-color: #0a84ff;
+}
+
+.toolbar .danger {
+  color: #fff;
+  background: #e53935;
+  border-color: #e53935;
+}

@@ -3,6 +3,8 @@ import type { PageElement } from '../db/schema';
 export interface Command {
   /** 受影響的頁面（M3：undo/redo 時捲到這一頁） */
   pageId: string;
+  /** 頁面已不存在時（例如 undo 新增頁面），改捲到這個位置 */
+  pageIndex?: number;
   undo(): Promise<void>;
   redo(): Promise<void>;
 }

@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { COLORS, tools, WIDTH_LABELS } from './tools';
 
 export interface ToolState {
@@ -15,9 +16,11 @@ interface Props {
   canRedo: boolean;
   onUndo(): void;
   onRedo(): void;
+  /** 工具列尾端的其他按鈕（頁面操作） */
+  children?: ComponentChildren;
 }
 
-export function Toolbar({ title, onBack, state, onChange, canUndo, canRedo, onUndo, onRedo }: Props) {
+export function Toolbar({ title, onBack, state, onChange, canUndo, canRedo, onUndo, onRedo, children }: Props) {
   return (
     <div class="toolbar" role="toolbar" aria-label="工具列">
       <div class="group">
@@ -62,6 +65,7 @@ export function Toolbar({ title, onBack, state, onChange, canUndo, canRedo, onUn
           重做
         </button>
       </div>
+      {children}
     </div>
   );
 }
