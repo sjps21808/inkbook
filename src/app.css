@@ -320,3 +320,39 @@ textarea,
   border: 2px solid #0a84ff;
   border-radius: 50%;
 }
+
+/* 文字框：字級用 cqw 換算（頁寬 = 595pt） */
+.page .overlay {
+  container-type: inline-size;
+}
+
+.overlay .text-el {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.overlay .text-el[contenteditable] {
+  min-height: 1.4em;
+  outline: 1.5px dashed #0a84ff;
+  pointer-events: auto;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 叫出 iOS 鍵盤用（見 editor/text.ts）；16px 以上避免 iOS 自動放大 */
+.focus-proxy {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  font-size: 16px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}

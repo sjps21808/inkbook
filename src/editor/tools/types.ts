@@ -1,5 +1,5 @@
 import type { InkDatabase } from '../../db/db';
-import type { PageElement } from '../../db/schema';
+import type { PageElement, TextElement } from '../../db/schema';
 
 /** 頁面座標（pt） */
 export interface Point {
@@ -29,6 +29,8 @@ export interface ToolContext {
   /** 這一頁目前選取的 element id */
   selection: string[];
   select(ids: string[]): void;
+  /** 開始編輯文字框（不在 elements 裡 = 新的文字框，失焦時有內容才存檔） */
+  editText(el: TextElement): void;
 }
 
 /** 一次性動作（點工具按鈕時執行）能使用的功能 */

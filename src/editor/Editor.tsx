@@ -15,6 +15,7 @@ import {
 import type { Notebook, Page, PageElement, StrokeElement, Template, TextElement } from '../db/schema';
 import { transformElement } from './geometry';
 import { ImageCache } from './images';
+import { blurEditing } from './text';
 import { elementsCommand, History, type Command, type ElementStore } from './history';
 import { PageActions } from './PageActions';
 import type { NewStroke, PenSettings } from './PageCanvas';
@@ -140,6 +141,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   };
 
   const onToolChange = (s: ToolState) => {
+    blurEditing();
     if (s.toolId !== toolState.toolId) setSelection(null);
     else if (s.color !== toolState.color && selection) {
       // 有選取時點顏色 = 改選取內容的顏色
@@ -242,6 +244,8 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
 
   /** 執行（或 undo/redo）後捲到受影響的頁面 */
   const run = (task: () => Promise<Command | undefined>) => {
+    // 先存下編輯中的文字（排在這個動作之前）
+    blurEditing();
     setSelection(null);
     void task()
       .then(async (cmd) => {

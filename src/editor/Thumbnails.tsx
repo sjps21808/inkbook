@@ -4,6 +4,7 @@ import { listElements } from '../db/repo';
 import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement, type Template } from '../db/schema';
 import type { ImageCache } from './images';
 import { renderInk } from './stroke';
+import { drawText } from './text';
 import { drawTemplate } from './templates';
 
 const THUMB_W = 120;
@@ -47,7 +48,9 @@ async function renderThumb(template: Template, els: PageElement[], images: Image
   const ink = make();
   const ctx = bg.getContext('2d')!;
   drawTemplate(ctx, template, scale);
-  renderInk(ink.getContext('2d')!, els, scale, (id) => bitmaps.get(id));
+  const inkCtx = ink.getContext('2d')!;
+  renderInk(inkCtx, els, scale, (id) => bitmaps.get(id));
+  for (const e of els) if (e.type === 'text') drawText(inkCtx, e, scale);
   ctx.globalCompositeOperation = 'multiply';
   ctx.drawImage(ink, 0, 0);
   const blob = await new Promise<Blob | null>((r) => bg.toBlob(r));

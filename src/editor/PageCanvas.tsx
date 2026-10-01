@@ -1,7 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { PAGE_HEIGHT, PAGE_WIDTH, type PageElement, type StrokeElement, type Template } from '../db/schema';
+import {
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+  type PageElement,
+  type StrokeElement,
+  type Template,
+  type TextElement,
+} from '../db/schema';
+import { TEXT_LINE_HEIGHT } from './geometry';
 import type { ImageCache } from './images';
 import { drawStroke, renderInk } from './stroke';
+import { blurEditing, focusProxy } from './text';
 import { drawTemplate } from './templates';
 import type { ToolDef } from './tools';
 import { SELECTION_PAD_PX, selectionBounds } from './tools/lasso';
@@ -65,6 +74,7 @@ export function PageCanvas(props: Props) {
   const shown = preview ?? elements;
   const shownRef = useRef(shown);
   shownRef.current = shown;
+  const [editing, setEditing] = useState<TextElement | null>(null);
   const templateRef = useRef(template);
   templateRef.current = template;
   const propsRef = useRef(props);
@@ -202,6 +212,10 @@ export function PageCanvas(props: Props) {
         },
         selection: p.selection,
         select: (ids) => propsRef.current.onSelect(ids),
+        editText(el) {
+          focusProxy();
+          setEditing(el);
+        },
         commit(added, removed) {
           const seq = previewSeq;
           void propsRef.current.onCommit(added, removed).finally(() => {
@@ -214,6 +228,8 @@ export function PageCanvas(props: Props) {
     const down = (e: PointerEvent) => {
       if (!isDrawPointer(e)) return;
       e.preventDefault();
+      // preventDefault 會擋掉點擊造成的失焦，手動結束文字編輯
+      blurEditing();
       if (pointerId !== null || !elementsRef.current) return;
       pointerId = e.pointerId;
       try {
@@ -289,12 +305,35 @@ export function PageCanvas(props: Props) {
 
   const box = props.selection.length ? selectionBounds(shown ?? [], props.selection) : null;
 
+  /** 結束編輯：空白 = 刪除（新的就不存），內容有變才存檔 */
+  const finishEdit = (el: TextElement, content: string) => {
+    setEditing(null);
+    const text = content.replace(/\s+$/, '');
+    const old = elementsRef.current?.find((e) => e.id === el.id);
+    if (!text.trim()) {
+      if (old) void props.onCommit([], [old]);
+      return;
+    }
+    if (old?.type === 'text' && old.content === text) return;
+    void props.onCommit([{ ...el, content: text }], old ? [old] : []);
+  };
+
   return (
     <div class="page" ref={pageRef} data-index={index} data-ready={elements ? '' : undefined}>
       <canvas class="bg" ref={bgRef} />
       <canvas class="ink" ref={inkRef} />
       <canvas class="live" ref={liveRef} />
-      <div class="overlay">{box && <SelectionBox box={box} />}</div>
+      <div class="overlay">
+        {(shown ?? []).map((e) =>
+          e.type === 'text' && e.id !== editing?.id ? (
+            <div key={e.id} class="text-el" style={textStyle(e)}>
+              {e.content}
+            </div>
+          ) : null,
+        )}
+        {editing && <TextEditor key={editing.id} el={editing} onDone={finishEdit} />}
+        {box && <SelectionBox box={box} />}
+      </div>
     </div>
   );
 }
@@ -317,4 +356,44 @@ function SelectionBox({ box }: { box: { x: number; y: number; w: number; h: numb
       <div class="handle" />
     </div>
   );
+}
+
+const textStyle = (e: TextElement) => ({
+  left: pct(e.x, PAGE_WIDTH),
+  top: pct(e.y, PAGE_HEIGHT),
+  width: pct(e.w, PAGE_WIDTH),
+  fontSize: `${(e.fontSize / PAGE_WIDTH) * 100}cqw`,
+  lineHeight: TEXT_LINE_HEIGHT,
+  color: e.color,
+});
+
+/** 編輯中的文字框；失焦或卸載（捲出可見範圍、離開筆記本）時存檔 */
+function TextEditor({ el, onDone }: { el: TextElement; onDone(el: TextElement, content: string): void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useLayoutEffect(() => {
+    const div = ref.current!;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      onDoneRef.current(el, div.innerText);
+    };
+    div.textContent = el.content;
+    div.focus({ preventScroll: true });
+    // 游標移到最後
+    const range = document.createRange();
+    range.selectNodeContents(div);
+    range.collapse(false);
+    const sel = getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    div.addEventListener('blur', finish);
+    return () => {
+      div.removeEventListener('blur', finish);
+      finish();
+    };
+  }, []);
+  return <div ref={ref} class="text-el" contentEditable="plaintext-only" style={textStyle(el)} />;
 }
