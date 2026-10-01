@@ -1,31 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadNotebook, requestPersist } from '../src/bootstrap';
 import { openInkDb } from '../src/db/db';
-import { createNotebook, putElements } from '../src/db/repo';
+import { addPage, createNotebook } from '../src/db/repo';
 import { notebookHash, parseHash } from '../src/router';
 
 let n = 0;
 
 describe('loadNotebook', () => {
-  it('讀取筆記本、第一頁與它的 element；找不到時回傳 null', async () => {
+  it('讀取筆記本與依順序排列的頁面；找不到時回傳 null', async () => {
     const db = await openInkDb(`test-boot-${n++}`);
     const { notebook, page } = await createNotebook(db, { title: 'nb' });
-    await putElements(db, [
-      {
-        id: 's',
-        pageId: page.id,
-        z: 0,
-        type: 'stroke',
-        tool: 'pen',
-        color: '#000',
-        width: 3,
-        points: new Float32Array([1, 2, 0.5]),
-      },
-    ]);
+    const p0 = await addPage(db, notebook.id, 0, 'grid');
     const opened = await loadNotebook(db, notebook.id);
     expect(opened?.notebook.title).toBe('nb');
-    expect(opened?.page.id).toBe(page.id);
-    expect(opened?.elements.map((e) => e.id)).toEqual(['s']);
+    expect(opened?.pages.map((p) => p.id)).toEqual([p0.id, page.id]);
     expect(await loadNotebook(db, 'missing')).toBeNull();
     db.close();
   });

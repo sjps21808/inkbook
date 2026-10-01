@@ -15,8 +15,10 @@ export interface PenSettings {
 export type NewStroke = Pick<StrokeElement, 'tool' | 'color' | 'width' | 'points'>;
 
 interface Props {
+  index: number;
   template: Template;
-  elements: PageElement[];
+  /** undefined = 還在載入（此時不能書寫） */
+  elements: PageElement[] | undefined;
   pen: PenSettings;
   onStroke(s: NewStroke): void;
 }
@@ -27,7 +29,15 @@ type SafariTouch = Touch & { touchType?: 'direct' | 'stylus' };
 const isDrawPointer = (e: PointerEvent) =>
   e.pointerType === 'pen' || (import.meta.env.DEV && e.pointerType === 'mouse');
 
-export function PageCanvas({ template, elements, pen, onStroke }: Props) {
+/** 全部頁面只讓一張 live canvas 佔用記憶體：換頁書寫時釋放前一張 */
+let activeLive: HTMLCanvasElement | null = null;
+
+const release = (cv: HTMLCanvasElement) => {
+  cv.width = 0;
+  cv.height = 0;
+};
+
+export function PageCanvas({ index, template, elements, pen, onStroke }: Props) {
   const pageRef = useRef<HTMLDivElement>(null);
   const bgRef = useRef<HTMLCanvasElement>(null);
   const inkRef = useRef<HTMLCanvasElement>(null);
@@ -44,12 +54,15 @@ export function PageCanvas({ template, elements, pen, onStroke }: Props) {
 
   const paintInk = () => {
     const ctx = inkRef.current?.getContext('2d');
-    if (ctx) renderInk(ctx, elementsRef.current, scaleRef.current);
+    if (ctx) renderInk(ctx, elementsRef.current ?? [], scaleRef.current);
   };
 
-  // 依顯示大小調整 canvas 解析度
+  // 依顯示大小調整 canvas 解析度；卸載時釋放 canvas 記憶體
   useLayoutEffect(() => {
     const page = pageRef.current!;
+    const bg = bgRef.current!;
+    const ink = inkRef.current!;
+    const live = liveRef.current!;
     const resize = () => {
       const rect = page.getBoundingClientRect();
       if (!rect.width) return;
@@ -57,20 +70,26 @@ export function PageCanvas({ template, elements, pen, onStroke }: Props) {
       const k = Math.min(dpr, MAX_CANVAS_PX / rect.height);
       const w = Math.round(rect.width * k);
       const h = Math.round(rect.height * k);
-      for (const cv of [bgRef.current!, inkRef.current!, liveRef.current!]) {
+      for (const cv of activeLive === live ? [bg, ink, live] : [bg, ink]) {
         if (cv.width !== w || cv.height !== h) {
           cv.width = w;
           cv.height = h;
         }
       }
       scaleRef.current = w / PAGE_WIDTH;
-      drawTemplate(bgRef.current!.getContext('2d')!, templateRef.current, scaleRef.current);
+      drawTemplate(bg.getContext('2d')!, templateRef.current, scaleRef.current);
       paintInk();
     };
+    // canvas 預設 300×150；live 等到書寫時才配置
+    if (activeLive !== live) release(live);
     const ro = new ResizeObserver(resize);
     ro.observe(page);
     resize();
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      if (activeLive === live) activeLive = null;
+      [bg, ink, live].forEach(release);
+    };
   }, []);
 
   useEffect(paintInk, [elements]);
@@ -79,6 +98,7 @@ export function PageCanvas({ template, elements, pen, onStroke }: Props) {
   // 用 layout effect 在繪製前掛上監聽，頁面一出現就能書寫
   useLayoutEffect(() => {
     const page = pageRef.current!;
+    const ink = inkRef.current!;
     const live = liveRef.current!;
     let pointerId: number | null = null;
     let pts: number[] = [];
@@ -100,6 +120,16 @@ export function PageCanvas({ template, elements, pen, onStroke }: Props) {
       ...penRef.current,
       points: Float32Array.from(pts),
     });
+    const claimLive = () => {
+      if (activeLive !== live) {
+        if (activeLive) release(activeLive);
+        activeLive = live;
+      }
+      if (live.width !== ink.width || live.height !== ink.height) {
+        live.width = ink.width;
+        live.height = ink.height;
+      }
+    };
     const clearLive = () => {
       const ctx = live.getContext('2d')!;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -115,14 +145,16 @@ export function PageCanvas({ template, elements, pen, onStroke }: Props) {
     };
 
     const down = (e: PointerEvent) => {
-      if (!isDrawPointer(e) || pointerId !== null) return;
+      if (!isDrawPointer(e)) return;
       e.preventDefault();
+      if (pointerId !== null || !elementsRef.current) return;
       pointerId = e.pointerId;
       try {
         page.setPointerCapture(e.pointerId);
       } catch {
         // 合成事件（測試）沒有對應的實體 pointer
       }
+      claimLive();
       pts = [];
       toPage(e);
       schedule();
@@ -141,13 +173,15 @@ export function PageCanvas({ template, elements, pen, onStroke }: Props) {
       cancelAnimationFrame(raf);
       raf = 0;
       // 先把這一筆畫到 ink，避免存檔完成前閃爍
-      drawStroke(inkRef.current!.getContext('2d')!, s, scaleRef.current);
+      drawStroke(ink.getContext('2d')!, s, scaleRef.current);
       clearLive();
       onStrokeRef.current({ tool: s.tool, color: s.color, width: s.width, points: s.points });
     };
     // iOS：pointerdown 的 preventDefault 擋不住捲動；筆觸碰或書寫中（手掌）時擋掉 touch
     const touch = (e: TouchEvent) => {
-      if (pointerId !== null || [...e.touches].some((t) => (t as SafariTouch).touchType === 'stylus')) e.preventDefault();
+      if (pointerId !== null || [...e.touches].some((t) => (t as SafariTouch).touchType === 'stylus')) {
+        e.preventDefault();
+      }
     };
     const noMenu = (e: Event) => e.preventDefault();
 
@@ -171,7 +205,7 @@ export function PageCanvas({ template, elements, pen, onStroke }: Props) {
   }, []);
 
   return (
-    <div class="page" ref={pageRef}>
+    <div class="page" ref={pageRef} data-index={index} data-ready={elements ? '' : undefined}>
       <canvas class="bg" ref={bgRef} />
       <canvas class="ink" ref={inkRef} />
       <canvas class="live" ref={liveRef} />

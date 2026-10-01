@@ -18,8 +18,7 @@ function NotebookView({ db, id }: { db: InkDatabase; id: string }) {
     <Editor
       db={db}
       notebook={opened.notebook}
-      page={opened.page}
-      initialElements={opened.elements}
+      initialPages={opened.pages}
       onBack={() => (location.hash = '#/')}
     />
   );

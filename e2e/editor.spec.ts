@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { drawStroke, elementCount, hLine, inkPixel, openNewNotebook } from './helpers/pen';
+import { drawStroke, elementCount, hLine, inkPixel, openNewNotebook, waitReady } from './helpers/pen';
 
 test.beforeEach(async ({ page }) => {
   await openNewNotebook(page);
@@ -18,7 +18,7 @@ test('pointerup 時存檔，重新整理後筆畫還在', async ({ page }) => {
   await drawStroke(page, hLine(0.3));
   await expect.poll(() => elementCount(page)).toBe(1);
   await page.reload();
-  await expect(page.locator('.page canvas.ink')).toBeVisible();
+  await waitReady(page);
   await expect.poll(async () => (await inkPixel(page, [0.5, 0.3]))[3]).toBe(255);
 });
 

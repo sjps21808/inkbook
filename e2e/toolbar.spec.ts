@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { drawStroke, elementCount, hLine, inkPixel, openNewNotebook } from './helpers/pen';
+import { drawStroke, elementCount, hLine, inkPixel, openNewNotebook, waitReady } from './helpers/pen';
 
 const tool = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
@@ -72,7 +72,7 @@ test('復原／重做，且結果寫入資料庫', async ({ page }) => {
   await undo.click();
   await expect.poll(() => elementCount(page)).toBe(0);
   await page.reload();
-  await expect(page.locator('.page canvas.ink')).toBeVisible();
+  await waitReady(page);
   await page.waitForTimeout(300);
   expect((await inkPixel(page, [0.5, 0.3]))[3]).toBe(0);
 });
