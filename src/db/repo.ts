@@ -53,12 +53,23 @@ export async function createPdfNotebook(
     pdf: { blobId: blob.id, pageNo: i + 1, srcWidth: s.width, srcHeight: s.height },
   }));
   const tx = db.transaction(['notebooks', 'pages', 'blobs'], 'readwrite');
-  await Promise.all([
-    tx.objectStore('blobs').add(blob),
-    tx.objectStore('notebooks').add(notebook),
-    ...pages.map((p) => tx.objectStore('pages').add(p)),
-    tx.done,
-  ]);
+  const writes: Promise<unknown>[] = [tx.done];
+  try {
+    // blob 最容易失敗，放第一個：WebKit 在其他請求之後才失敗時，整個資料庫會卡住（E2E 實測）
+    writes.push(tx.objectStore('blobs').add(blob));
+    writes.push(tx.objectStore('notebooks').add(notebook));
+    for (const p of pages) writes.push(tx.objectStore('pages').add(p));
+    await Promise.all(writes);
+  } catch (e) {
+    // 任何一筆失敗（例如 blob 無法儲存）都整個回滾，不留下沒有 PDF 的筆記本；回滾後其餘請求都會 reject
+    for (const w of writes) w.catch(() => {});
+    try {
+      tx.abort();
+    } catch {
+      // 交易已經結束
+    }
+    throw e;
+  }
   return { notebook, pages };
 }
 
