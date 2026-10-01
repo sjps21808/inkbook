@@ -8,6 +8,7 @@ import {
   listPages,
   newId,
   putElements,
+  reorderPages,
   restorePage,
   type PageSnapshot,
 } from '../db/repo';
@@ -16,6 +17,7 @@ import { elementsCommand, History, type Command, type ElementStore } from './his
 import { PageActions } from './PageActions';
 import type { NewStroke, PenSettings } from './PageCanvas';
 import { PageList, type PageListHandle } from './PageList';
+import { Thumbnails } from './Thumbnails';
 import { Toolbar, type ToolState } from './Toolbar';
 import { COLORS, tools } from './tools';
 
@@ -35,6 +37,9 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   const [pages, setPages] = useState(initialPages);
   // 已載入頁面的 element；ref 同步更新，讓連續書寫時 z 不會重複
   const [cache, setCache] = useState<Cache>({});
+  // 每頁內容的版本（縮圖據此重新產生）
+  const [versions, setVersions] = useState<Record<string, number>>({});
+  const [showThumbs, setShowThumbs] = useState(false);
   const cacheRef = useRef<Cache>(cache);
   const loading = useRef(new Set<string>());
   const listRef = useRef<PageListHandle>(null);
@@ -45,11 +50,18 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   const tool = tools.find((t) => t.id === toolState.toolId)!;
   const pen: PenSettings = { tool: tool.stroke, color: toolState.color, width: tool.widths[toolState.widthIdx] };
 
+  const bump = (pageIds: Iterable<string>) =>
+    setVersions((v) => {
+      const next = { ...v };
+      for (const id of pageIds) next[id] = (next[id] ?? 0) + 1;
+      return next;
+    });
   const updateCache = (fn: (c: Cache) => Cache) => {
     cacheRef.current = fn(cacheRef.current);
     setCache(cacheRef.current);
   };
   const setPageCache = (pageId: string, els: PageElement[] | undefined) => {
+    bump([pageId]);
     if (els) loading.current.add(pageId);
     else loading.current.delete(pageId);
     updateCache((c) => {
@@ -72,7 +84,8 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
 
   // 同時更新畫面與資料庫（未載入的頁面只寫資料庫，載入時會讀到）
   const store = useMemo<ElementStore>(() => {
-    const edit = (els: PageElement[], fn: (cur: PageElement[], ids: Set<string>) => PageElement[]) =>
+    const edit = (els: PageElement[], fn: (cur: PageElement[], ids: Set<string>) => PageElement[]) => {
+      bump(new Set(els.map((e) => e.pageId)));
       updateCache((c) => {
         const next = { ...c };
         for (const pageId of new Set(els.map((e) => e.pageId))) {
@@ -81,6 +94,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         }
         return next;
       });
+    };
     return {
       async add(els) {
         edit(els, (cur, ids) => [...cur.filter((e) => !ids.has(e.id)), ...els.filter((e) => ids.has(e.id))]);
@@ -143,6 +157,24 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     };
   };
 
+  const reorderCommand = (from: number, to: number): Command => {
+    const before = pages.map((p) => p.id);
+    const after = [...before];
+    const [moved] = after.splice(from, 1);
+    after.splice(to, 0, moved);
+    return {
+      pageId: moved,
+      async redo() {
+        await reorderPages(db, notebook.id, after);
+        await reloadPages();
+      },
+      async undo() {
+        await reorderPages(db, notebook.id, before);
+        await reloadPages();
+      },
+    };
+  };
+
   /** 執行（或 undo/redo）後捲到受影響的頁面 */
   const run = (task: () => Promise<Command | undefined>) => {
     void task()
@@ -167,6 +199,11 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         onUndo={() => run(() => history.undo())}
         onRedo={() => run(() => history.redo())}
       >
+        <div class="group">
+          <button aria-pressed={showThumbs} onClick={() => setShowThumbs((s) => !s)}>
+            頁面
+          </button>
+        </div>
         <PageActions
           defaultTemplate={notebook.template}
           canDelete={pages.length > 1}
@@ -175,6 +212,16 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
           onDelete={(index) => execute(deletePageCommand(pages[index], index))}
         />
       </Toolbar>
+      {showThumbs && (
+        <Thumbnails
+          db={db}
+          pages={pages}
+          elementsOf={(id) => cache[id]}
+          versions={versions}
+          onJump={(i) => listRef.current?.scrollToPage(pages[i].id)}
+          onReorder={(from, to) => execute(reorderCommand(from, to))}
+        />
+      )}
       <PageList
         handle={listRef}
         pages={pages}
