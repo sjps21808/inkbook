@@ -1,6 +1,6 @@
 import type { IDBPTransaction } from 'idb';
 import type { InkDatabase } from './db';
-import type { InkDB, Notebook, Page, PageElement, Template } from './schema';
+import type { BlobRecord, InkDB, Notebook, Page, PageElement, Template } from './schema';
 
 export const newId = () => crypto.randomUUID();
 
@@ -22,6 +22,48 @@ export async function createNotebook(
   const tx = db.transaction(['notebooks', 'pages'], 'readwrite');
   await Promise.all([tx.objectStore('notebooks').add(notebook), tx.objectStore('pages').add(page), tx.done]);
   return { notebook, page };
+}
+
+export interface PdfPageSize {
+  width: number;
+  height: number;
+}
+
+/** 匯入 PDF：一次寫入筆記本、PDF blob，以及每個 PDF 頁對應的 Page（不預先渲染） */
+export async function createPdfNotebook(
+  db: InkDatabase,
+  init: { title: string; data: Blob; sizes: PdfPageSize[] },
+): Promise<{ notebook: Notebook; pages: Page[] }> {
+  const now = Date.now();
+  const notebook: Notebook = {
+    id: newId(),
+    title: init.title,
+    folderId: null,
+    coverColor: '#e53935',
+    template: 'blank',
+    createdAt: now,
+    updatedAt: now,
+  };
+  const blob: BlobRecord = { id: newId(), data: init.data, mime: 'application/pdf' };
+  const pages: Page[] = init.sizes.map((s, i) => ({
+    id: newId(),
+    notebookId: notebook.id,
+    order: i,
+    template: 'blank',
+    pdf: { blobId: blob.id, pageNo: i + 1, srcWidth: s.width, srcHeight: s.height },
+  }));
+  const tx = db.transaction(['notebooks', 'pages', 'blobs'], 'readwrite');
+  await Promise.all([
+    tx.objectStore('blobs').add(blob),
+    tx.objectStore('notebooks').add(notebook),
+    ...pages.map((p) => tx.objectStore('pages').add(p)),
+    tx.done,
+  ]);
+  return { notebook, pages };
+}
+
+export function getBlob(db: InkDatabase, id: string): Promise<BlobRecord | undefined> {
+  return db.get('blobs', id);
 }
 
 export function getNotebook(db: InkDatabase, id: string): Promise<Notebook | undefined> {
