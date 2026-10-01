@@ -129,3 +129,81 @@ html, body {
 .toolbar .swatch[aria-pressed="true"] {
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0a84ff;
 }
+
+/* 全域關閉文字選取，但輸入框要能打字 */
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.toolbar .nb-title {
+  align-self: center;
+  max-width: 12em;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.library-actions,
+.new-notebook {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.library button,
+.new-notebook input {
+  height: 40px;
+  padding: 0 14px;
+  font-size: 16px;
+  color: #1c1c1e;
+  background: #fff;
+  border: 1px solid #d1d1d6;
+  border-radius: 8px;
+}
+
+.new-notebook input {
+  flex: 1;
+}
+
+.notebook-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.library .notebook-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 56px;
+  text-align: left;
+}
+
+.notebook-card .cover {
+  width: 24px;
+  height: 32px;
+  border-radius: 3px;
+}
+
+.notebook-card .title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.notebook-card .time {
+  color: #8e8e93;
+  font-size: 13px;
+}

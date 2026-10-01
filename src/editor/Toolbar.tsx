@@ -7,6 +7,8 @@ export interface ToolState {
 }
 
 interface Props {
+  title: string;
+  onBack(): void;
   state: ToolState;
   onChange(s: ToolState): void;
   canUndo: boolean;
@@ -15,9 +17,13 @@ interface Props {
   onRedo(): void;
 }
 
-export function Toolbar({ state, onChange, canUndo, canRedo, onUndo, onRedo }: Props) {
+export function Toolbar({ title, onBack, state, onChange, canUndo, canRedo, onUndo, onRedo }: Props) {
   return (
     <div class="toolbar" role="toolbar" aria-label="工具列">
+      <div class="group">
+        <button onClick={onBack}>‹ 書架</button>
+        <span class="nb-title">{title}</span>
+      </div>
       <div class="group">
         {tools.map((t) => (
           <button

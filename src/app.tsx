@@ -1,27 +1,37 @@
 import { useEffect, useState } from 'preact/hooks';
+import { loadNotebook, requestPersist, type OpenedNotebook } from './bootstrap';
 import { openInkDb, type InkDatabase } from './db/db';
-import { openFirstPage, requestPersist } from './bootstrap';
-import type { Page, PageElement } from './db/schema';
 import { Editor } from './editor/Editor';
+import { Library } from './library/Library';
 import { UpdatePrompt } from './pwa/UpdatePrompt';
+import { notebookHash, useRoute } from './router';
 
-interface Loaded {
-  db: InkDatabase;
-  page: Page;
-  elements: PageElement[];
-}
+function NotebookView({ db, id }: { db: InkDatabase; id: string }) {
+  const [opened, setOpened] = useState<OpenedNotebook | null | undefined>(undefined);
+  useEffect(() => {
+    void loadNotebook(db, id).then(setOpened);
+  }, [db, id]);
 
-async function load(): Promise<Loaded> {
-  void requestPersist();
-  const db = await openInkDb();
-  return { db, ...(await openFirstPage(db)) };
+  if (opened === undefined) return <p class="empty">載入中…</p>;
+  if (opened === null) return <p class="empty">找不到這本筆記本</p>;
+  return (
+    <Editor
+      db={db}
+      notebook={opened.notebook}
+      page={opened.page}
+      initialElements={opened.elements}
+      onBack={() => (location.hash = '#/')}
+    />
+  );
 }
 
 export function App() {
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [db, setDb] = useState<InkDatabase | null>(null);
+  const route = useRoute();
 
   useEffect(() => {
-    void load().then(setLoaded);
+    void requestPersist();
+    void openInkDb().then(setDb);
   }, []);
 
   return (
@@ -32,10 +42,12 @@ export function App() {
         <UpdatePrompt />
       </header>
       <main>
-        {loaded ? (
-          <Editor db={loaded.db} page={loaded.page} initialElements={loaded.elements} />
-        ) : (
+        {!db ? (
           <p class="empty">載入中…</p>
+        ) : route.name === 'notebook' ? (
+          <NotebookView key={route.id} db={db} id={route.id} />
+        ) : (
+          <Library db={db} onOpen={(id) => (location.hash = notebookHash(id))} />
         )}
       </main>
     </>

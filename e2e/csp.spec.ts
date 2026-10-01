@@ -24,7 +24,7 @@ test('build 的 HTML 帶有 CSP', async ({ page }) => {
 
 test('一般開啟沒有 CSP 違規', async ({ page }) => {
   await page.goto('./');
-  await expect(page.locator('.page canvas.ink')).toBeVisible();
+  await expect(page.getByRole('button', { name: '新增筆記本' })).toBeVisible();
   expect(await violations(page)).toEqual([]);
 });
 

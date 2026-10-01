@@ -64,3 +64,12 @@ export function elementCount(page: Page) {
       }),
   );
 }
+
+/** 從書架新增一本筆記本並開啟 */
+export async function openNewNotebook(page: Page, title = '測試筆記') {
+  await page.goto('./');
+  await page.getByRole('button', { name: '新增筆記本' }).click();
+  await page.getByLabel('筆記本標題').fill(title);
+  await page.getByRole('button', { name: '建立' }).click();
+  await page.locator('.page canvas.ink').waitFor();
+}

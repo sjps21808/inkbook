@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { drawStroke, elementCount, hLine, inkPixel } from './helpers/pen';
+import { drawStroke, elementCount, hLine, inkPixel, openNewNotebook } from './helpers/pen';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('./');
-  await expect(page.locator('.page canvas.ink')).toBeVisible();
+  await openNewNotebook(page);
 });
 
 test('Pencil 畫一筆會出現在 ink 圖層', async ({ page }) => {

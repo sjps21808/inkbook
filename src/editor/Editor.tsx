@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'preact/hooks';
 import type { InkDatabase } from '../db/db';
 import { deleteElements, newId, putElements } from '../db/repo';
-import type { Page, PageElement, StrokeElement } from '../db/schema';
+import type { Notebook, Page, PageElement, StrokeElement } from '../db/schema';
 import { elementsCommand, History, type ElementStore } from './history';
 import { PageCanvas, type NewStroke, type PenSettings } from './PageCanvas';
 import { Toolbar, type ToolState } from './Toolbar';
@@ -9,12 +9,13 @@ import { COLORS, tools } from './tools';
 
 interface Props {
   db: InkDatabase;
+  notebook: Notebook;
   page: Page;
   initialElements: PageElement[];
+  onBack(): void;
 }
 
-
-export function Editor({ db, page, initialElements }: Props) {
+export function Editor({ db, notebook, page, initialElements, onBack }: Props) {
   const [elements, setElements] = useState(initialElements);
   const elementsRef = useRef(elements);
   elementsRef.current = elements;
@@ -52,6 +53,8 @@ export function Editor({ db, page, initialElements }: Props) {
   return (
     <div class="editor">
       <Toolbar
+        title={notebook.title}
+        onBack={onBack}
         state={toolState}
         onChange={setToolState}
         canUndo={history.canUndo}

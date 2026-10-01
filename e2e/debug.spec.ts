@@ -11,7 +11,7 @@ test('一般開啟時不載入 eruda', async ({ page }) => {
     if (/eruda/i.test(r.url())) erudaRequests.push(r.url());
   });
   await page.goto('./');
-  await expect(page.locator('.page canvas.ink')).toBeVisible();
+  await expect(page.getByRole('button', { name: '新增筆記本' })).toBeVisible();
   await expect(page.locator('#eruda')).toHaveCount(0);
   expect(erudaRequests).toEqual([]);
 });

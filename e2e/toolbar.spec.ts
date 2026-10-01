@@ -1,11 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { drawStroke, elementCount, hLine, inkPixel } from './helpers/pen';
+import { drawStroke, elementCount, hLine, inkPixel, openNewNotebook } from './helpers/pen';
 
 const tool = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('./');
-  await expect(page.locator('.page canvas.ink')).toBeVisible();
+  await openNewNotebook(page);
 });
 
 test('選紅色後畫出紅色', async ({ page }) => {
