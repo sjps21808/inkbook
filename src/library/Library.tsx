@@ -3,6 +3,7 @@ import type { InkDatabase } from '../db/db';
 import { createFolder, createNotebook, listFolders, listNotebooks } from '../db/repo';
 import type { Folder, Notebook } from '../db/schema';
 import { actions, type LibraryContext } from './actions';
+import { daysSince, getLastBackupAt, needsBackupReminder, runBackup } from './backupActions';
 import { ItemDialog, ItemMenu, type Item, type ItemAction } from './ItemDialogs';
 
 interface Props {
@@ -31,6 +32,7 @@ export function Library({ db, onOpen }: Props) {
   const [folderId, setFolderIdState] = useState<string | null>(lastFolderId);
   const [creating, setCreating] = useState<'notebook' | 'folder' | null>(null);
   const [name, setName] = useState('');
+  const [lastBackupAt, setLastBackupAt] = useState<number | null | undefined>(undefined);
   const [editing, setEditing] = useState<{ item: Item; action: ItemAction } | null>(null);
 
   const setFolderId = (id: string | null) => {
@@ -39,6 +41,7 @@ export function Library({ db, onOpen }: Props) {
   };
 
   const refresh = () => {
+    void getLastBackupAt(db).then(setLastBackupAt);
     void listNotebooks(db).then((nbs) => setNotebooks(nbs.sort((a, b) => b.updatedAt - a.updatedAt)));
     void listFolders(db).then((fs) => {
       setFolders(fs.sort((a, b) => a.createdAt - b.createdAt));
@@ -107,6 +110,16 @@ export function Library({ db, onOpen }: Props) {
         {renderTree(null)}
       </nav>
       <section class="library-main">
+        {lastBackupAt !== undefined && notebooks && needsBackupReminder(lastBackupAt, notebooks.length) && (
+          <div class="backup-reminder" role="status">
+            <span>
+              {lastBackupAt === null
+                ? '還沒有備份過。筆記只存在這台 iPad 上，建議定期備份。'
+                : `已經 ${daysSince(lastBackupAt)} 天沒有備份了。`}
+            </span>
+            <button onClick={() => void runBackup(ctx)}>立即備份</button>
+          </div>
+        )}
         <div class="library-actions">
           <button onClick={() => startCreate('notebook')}>新增筆記本</button>
           <button onClick={() => startCreate('folder')}>新增資料夾</button>

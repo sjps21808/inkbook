@@ -15,6 +15,18 @@ export async function getLastBackupAt(db: InkDatabase): Promise<number | null> {
   return (await db.get('meta', 'lastBackupAt'))?.value ?? null;
 }
 
+export const BACKUP_REMINDER_DAYS = 7;
+const DAY = 24 * 60 * 60 * 1000;
+
+/** 要不要顯示備份提示：從未備份且有筆記本，或距離上次備份超過 7 天 */
+export function needsBackupReminder(lastBackupAt: number | null, notebookCount: number, now = Date.now()): boolean {
+  if (lastBackupAt === null) return notebookCount > 0;
+  return now - lastBackupAt > BACKUP_REMINDER_DAYS * DAY;
+}
+
+/** 距離上次備份的天數（無條件捨去） */
+export const daysSince = (t: number, now = Date.now()) => Math.floor((now - t) / DAY);
+
 export const markBackedUp = (db: InkDatabase, at = Date.now()) => db.put('meta', { key: 'lastBackupAt', value: at });
 
 /** 用分享面板儲存檔案，不支援時改用下載；使用者取消時回傳 false */

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { backupFileName, shareOrDownload } from '../src/library/backupActions';
+import { backupFileName, daysSince, needsBackupReminder, shareOrDownload } from '../src/library/backupActions';
 
 const file = () => new File([new Uint8Array([1])], 'a.inkbak');
 
@@ -50,5 +50,22 @@ describe('shareOrDownload', () => {
     expect(await shareOrDownload(file())).toBe(true);
     expect(names).toEqual(['a.inkbak', 'a.inkbak']);
     click.mockRestore();
+  });
+});
+
+describe('needsBackupReminder', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = 100 * DAY;
+
+  it('從未備份：有筆記本才提示', () => {
+    expect(needsBackupReminder(null, 0, now)).toBe(false);
+    expect(needsBackupReminder(null, 1, now)).toBe(true);
+  });
+
+  it('超過 7 天才提示', () => {
+    expect(needsBackupReminder(now - 7 * DAY, 3, now)).toBe(false);
+    expect(needsBackupReminder(now - 7 * DAY - 1, 3, now)).toBe(true);
+    expect(needsBackupReminder(now - 8 * DAY, 0, now)).toBe(true);
+    expect(daysSince(now - 8 * DAY - 5, now)).toBe(8);
   });
 });
