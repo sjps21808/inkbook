@@ -3,6 +3,7 @@ import type { InkDatabase } from '../db/db';
 import { createFolder, createNotebook, listFolders, listNotebooks } from '../db/repo';
 import type { Folder, Notebook } from '../db/schema';
 import { actions, type LibraryContext } from './actions';
+import { ItemDialog, ItemMenu, type Item, type ItemAction } from './ItemDialogs';
 
 interface Props {
   db: InkDatabase;
@@ -18,6 +19,9 @@ const formatTime = (t: number) =>
     minute: '2-digit',
   });
 
+const folderItem = (f: Folder): Item => ({ type: 'folder', id: f.id, name: f.name, parentId: f.parentId });
+const notebookItem = (nb: Notebook): Item => ({ type: 'notebook', id: nb.id, name: nb.title, parentId: nb.folderId });
+
 // 從筆記本返回書架時，停留在原本的資料夾
 let lastFolderId: string | null = null;
 
@@ -27,6 +31,7 @@ export function Library({ db, onOpen }: Props) {
   const [folderId, setFolderIdState] = useState<string | null>(lastFolderId);
   const [creating, setCreating] = useState<'notebook' | 'folder' | null>(null);
   const [name, setName] = useState('');
+  const [editing, setEditing] = useState<{ item: Item; action: ItemAction } | null>(null);
 
   const setFolderId = (id: string | null) => {
     lastFolderId = id;
@@ -81,6 +86,7 @@ export function Library({ db, onOpen }: Props) {
             >
               {f.name}
             </button>
+            <ItemMenu item={folderItem(f)} onPick={(action) => setEditing({ item: folderItem(f), action })} />
             {renderTree(f.id)}
           </li>
         ))}
@@ -135,10 +141,24 @@ export function Library({ db, onOpen }: Props) {
                 <span class="title">{nb.title}</span>
                 <span class="time">{formatTime(nb.updatedAt)}</span>
               </button>
+              <ItemMenu item={notebookItem(nb)} onPick={(action) => setEditing({ item: notebookItem(nb), action })} />
             </li>
           ))}
         </ul>
       </section>
+      {editing && (
+        <ItemDialog
+          db={db}
+          item={editing.item}
+          action={editing.action}
+          folders={folders}
+          onCancel={() => setEditing(null)}
+          onDone={() => {
+            setEditing(null);
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
