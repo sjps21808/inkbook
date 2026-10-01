@@ -1,6 +1,6 @@
 import type { IDBPTransaction } from 'idb';
 import type { InkDatabase } from './db';
-import type { BlobRecord, InkDB, Notebook, Page, PageElement, Template } from './schema';
+import type { BlobRecord, Folder, InkDB, Notebook, Page, PageElement, Template } from './schema';
 
 export const newId = () => crypto.randomUUID();
 
@@ -120,17 +120,96 @@ async function writeElements(db: InkDatabase, els: PageElement[], mode: 'put' | 
   await Promise.all([...writes, touch(), tx.done]);
 }
 
+type NotebookTx = IDBPTransaction<InkDB, ('notebooks' | 'pages' | 'elements' | 'folders')[], 'readwrite'>;
+
+async function removeNotebook(tx: NotebookTx, notebookId: string): Promise<void> {
+  const pageIds = await tx.objectStore('pages').index('notebookId').getAllKeys(notebookId);
+  for (const pageId of pageIds) {
+    const elIds = await tx.objectStore('elements').index('pageId').getAllKeys(pageId);
+    await Promise.all(elIds.map((id) => tx.objectStore('elements').delete(id)));
+    await tx.objectStore('pages').delete(pageId);
+  }
+  await tx.objectStore('notebooks').delete(notebookId);
+}
+
 /** 刪除筆記本，連同它的頁面與 element */
 export async function deleteNotebook(db: InkDatabase, notebookId: string): Promise<void> {
-  const tx = db.transaction(['notebooks', 'pages', 'elements'], 'readwrite');
-  const run = async () => {
-    const pageIds = await tx.objectStore('pages').index('notebookId').getAllKeys(notebookId);
-    for (const pageId of pageIds) {
-      const elIds = await tx.objectStore('elements').index('pageId').getAllKeys(pageId);
-      await Promise.all(elIds.map((id) => tx.objectStore('elements').delete(id)));
-      await tx.objectStore('pages').delete(pageId);
+  const tx = db.transaction(['notebooks', 'pages', 'elements', 'folders'], 'readwrite');
+  await Promise.all([removeNotebook(tx, notebookId), tx.done]);
+}
+
+async function updateNotebook(db: InkDatabase, id: string, patch: Partial<Notebook>): Promise<void> {
+  const tx = db.transaction('notebooks', 'readwrite');
+  const nb = await tx.store.get(id);
+  if (nb) await tx.store.put({ ...nb, ...patch });
+  await tx.done;
+}
+
+export const renameNotebook = (db: InkDatabase, id: string, title: string) => updateNotebook(db, id, { title });
+
+export const moveNotebook = (db: InkDatabase, id: string, folderId: string | null) =>
+  updateNotebook(db, id, { folderId });
+
+export async function createFolder(db: InkDatabase, name: string, parentId: string | null): Promise<Folder> {
+  const folder: Folder = { id: newId(), name, parentId, createdAt: Date.now() };
+  await db.add('folders', folder);
+  return folder;
+}
+
+export function listFolders(db: InkDatabase): Promise<Folder[]> {
+  return db.getAll('folders');
+}
+
+/** id 本身與所有子孫資料夾的 id */
+export function folderSubtree(folders: Folder[], id: string): Set<string> {
+  const ids = new Set([id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const f of folders) {
+      if (f.parentId !== null && ids.has(f.parentId) && !ids.has(f.id)) {
+        ids.add(f.id);
+        grew = true;
+      }
     }
-    await tx.objectStore('notebooks').delete(notebookId);
+  }
+  return ids;
+}
+
+export async function renameFolder(db: InkDatabase, id: string, name: string): Promise<void> {
+  const tx = db.transaction('folders', 'readwrite');
+  const f = await tx.store.get(id);
+  if (f) await tx.store.put({ ...f, name });
+  await tx.done;
+}
+
+/** 移動資料夾；不可以移到自己或自己的子孫底下 */
+export async function moveFolder(db: InkDatabase, id: string, parentId: string | null): Promise<void> {
+  const tx = db.transaction('folders', 'readwrite');
+  const folders = await tx.store.getAll();
+  const invalid = parentId !== null && folderSubtree(folders, id).has(parentId);
+  const f = folders.find((x) => x.id === id);
+  if (f && !invalid) await tx.store.put({ ...f, parentId });
+  await tx.done;
+  if (invalid) throw new Error('不能把資料夾移到自己或子資料夾底下');
+}
+
+/** 資料夾（含子孫）裡的資料夾數與筆記本數，供刪除確認使用；資料夾數包含自己 */
+export async function folderContents(db: InkDatabase, id: string): Promise<{ folders: number; notebooks: number }> {
+  const ids = folderSubtree(await listFolders(db), id);
+  const notebooks = (await listNotebooks(db)).filter((nb) => nb.folderId !== null && ids.has(nb.folderId));
+  return { folders: ids.size, notebooks: notebooks.length };
+}
+
+/** 遞迴刪除資料夾、子資料夾，以及裡面的筆記本 */
+export async function deleteFolder(db: InkDatabase, id: string): Promise<void> {
+  const tx = db.transaction(['notebooks', 'pages', 'elements', 'folders'], 'readwrite');
+  const run = async () => {
+    const ids = folderSubtree(await tx.objectStore('folders').getAll(), id);
+    // folderId 可能是 null（不會被索引），所以直接讀全部再篩選
+    for (const nb of await tx.objectStore('notebooks').getAll()) {
+      if (nb.folderId !== null && ids.has(nb.folderId)) await removeNotebook(tx, nb.id);
+    }
+    await Promise.all([...ids].map((fid) => tx.objectStore('folders').delete(fid)));
   };
   await Promise.all([run(), tx.done]);
 }
