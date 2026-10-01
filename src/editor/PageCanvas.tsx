@@ -74,7 +74,8 @@ export function PageCanvas({ elements, pen, onStroke }: Props) {
   useEffect(paintInk, [elements]);
 
   // 輸入：pen 畫圖；touch 交給原生捲動與縮放
-  useEffect(() => {
+  // 用 layout effect 在繪製前掛上監聽，頁面一出現就能書寫
+  useLayoutEffect(() => {
     const page = pageRef.current!;
     const live = liveRef.current!;
     let pointerId: number | null = null;
