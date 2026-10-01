@@ -7,6 +7,7 @@ import {
   type Template,
   type TextElement,
 } from '../db/schema';
+import type { PdfDocs, PdfRef, RenderJob } from '../pdf/render';
 import { TEXT_LINE_HEIGHT } from './geometry';
 import type { ImageCache } from './images';
 import { drawStroke, renderInk } from './stroke';
@@ -32,6 +33,9 @@ interface Props {
   pageId: string;
   images: ImageCache;
   template: Template;
+  /** PDF 頁的來源；有的話 bg 畫 PDF */
+  pdf?: PdfRef;
+  pdfDocs: PdfDocs;
   /** undefined = 還在載入（此時不能書寫） */
   elements: PageElement[] | undefined;
   pen: PenSettings;
@@ -61,7 +65,7 @@ const release = (cv: HTMLCanvasElement) => {
 };
 
 export function PageCanvas(props: Props) {
-  const { index, template, elements } = props;
+  const { index, template, pdf, pdfDocs, elements } = props;
   const pageRef = useRef<HTMLDivElement>(null);
   const bgRef = useRef<HTMLCanvasElement>(null);
   const inkRef = useRef<HTMLCanvasElement>(null);
@@ -100,6 +104,13 @@ export function PageCanvas(props: Props) {
     const bg = bgRef.current!;
     const ink = inkRef.current!;
     const live = liveRef.current!;
+    let bgJob: RenderJob | null = null;
+    const paintBg = () => {
+      bgJob?.cancel();
+      drawTemplate(bg.getContext('2d')!, templateRef.current, scaleRef.current);
+      // PDF 頁在掛載時才渲染（不預先渲染）；尺寸改變時取消舊的、重畫
+      if (pdf) bgJob = pdfDocs.render(bg, pdf, scaleRef.current);
+    };
     const resize = () => {
       const rect = page.getBoundingClientRect();
       if (!rect.width) return;
@@ -114,7 +125,7 @@ export function PageCanvas(props: Props) {
         }
       }
       scaleRef.current = w / PAGE_WIDTH;
-      drawTemplate(bg.getContext('2d')!, templateRef.current, scaleRef.current);
+      paintBg();
       paintInk();
     };
     // canvas 預設 300×150；live 等到書寫時才配置
@@ -124,6 +135,7 @@ export function PageCanvas(props: Props) {
     resize();
     return () => {
       ro.disconnect();
+      bgJob?.cancel();
       if (activeLive === live) activeLive = null;
       [bg, ink, live].forEach(release);
     };

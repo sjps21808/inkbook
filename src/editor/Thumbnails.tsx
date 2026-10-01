@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { InkDatabase } from '../db/db';
 import { listElements } from '../db/repo';
-import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement, type Template } from '../db/schema';
+import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement } from '../db/schema';
+import type { PdfDocs } from '../pdf/render';
 import type { ImageCache } from './images';
 import { renderInk } from './stroke';
 import { drawText } from './text';
@@ -20,13 +21,14 @@ interface Props {
   elementsOf(pageId: string): PageElement[] | undefined;
   /** 頁面內容的版本；變動時重新產生縮圖 */
   versions: Record<string, number>;
+  pdfDocs: PdfDocs;
   onJump(index: number): void;
   onReorder(from: number, to: number): void;
 }
 
 const px = (v: number) => `${v}px`;
 
-async function renderThumb(template: Template, els: PageElement[], images: ImageCache): Promise<string> {
+async function renderThumb(page: Page, els: PageElement[], images: ImageCache, pdfDocs: PdfDocs): Promise<string> {
   const bitmaps = new Map<string, ImageBitmap>();
   for (const e of els) {
     if (e.type === 'image') {
@@ -47,7 +49,8 @@ async function renderThumb(template: Template, els: PageElement[], images: Image
   const bg = make();
   const ink = make();
   const ctx = bg.getContext('2d')!;
-  drawTemplate(ctx, template, scale);
+  drawTemplate(ctx, page.template, scale);
+  if (page.pdf) await pdfDocs.render(bg, page.pdf, scale).done;
   const inkCtx = ink.getContext('2d')!;
   renderInk(inkCtx, els, scale, (id) => bitmaps.get(id));
   for (const e of els) if (e.type === 'text') drawText(inkCtx, e, scale);
@@ -58,7 +61,7 @@ async function renderThumb(template: Template, els: PageElement[], images: Image
   return URL.createObjectURL(blob!);
 }
 
-export function Thumbnails({ db, images, pages, elementsOf, versions, onJump, onReorder }: Props) {
+export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, onJump, onReorder }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const urls = useRef(new Map<string, { url: string; v: number }>());
   const pending = useRef(new Set<string>());
@@ -80,7 +83,7 @@ export function Thumbnails({ db, images, pages, elementsOf, versions, onJump, on
     queue.current = queue.current
       .then(async () => {
         const els = latest.current.elementsOf(pageId) ?? (await listElements(db, pageId));
-        const url = await renderThumb(page.template, els, images);
+        const url = await renderThumb(page, els, images, pdfDocs);
         const old = urls.current.get(pageId);
         if (old) URL.revokeObjectURL(old.url);
         urls.current.set(pageId, { url, v });

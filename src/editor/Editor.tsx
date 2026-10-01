@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { InkDatabase } from '../db/db';
 import {
   addPage,
@@ -13,6 +13,7 @@ import {
   type PageSnapshot,
 } from '../db/repo';
 import type { Notebook, Page, PageElement, StrokeElement, Template, TextElement } from '../db/schema';
+import { PdfDocs } from '../pdf/render';
 import { transformElement } from './geometry';
 import { ImageCache } from './images';
 import { blurEditing } from './text';
@@ -48,6 +49,8 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   const listRef = useRef<PageListHandle>(null);
   const history = useMemo(() => new History(), []);
   const images = useMemo(() => new ImageCache(db), [db]);
+  const pdfDocs = useMemo(() => new PdfDocs(db), [db]);
+  useEffect(() => () => pdfDocs.destroy(), [pdfDocs]);
   const [, rerender] = useState(0);
   const refresh = () => rerender((n) => n + 1);
   const [toolState, setToolState] = useState<ToolState>({
@@ -296,6 +299,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
           pages={pages}
           elementsOf={(id) => cache[id]}
           versions={versions}
+          pdfDocs={pdfDocs}
           onJump={(i) => listRef.current?.scrollToPage(pages[i].id)}
           onReorder={(from, to) => execute(reorderCommand(from, to))}
         />
@@ -313,6 +317,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         onCommit={onCommit}
         selection={selection}
         onSelect={(pageId, ids) => setSelection(ids.length ? { pageId, ids } : null)}
+        pdfDocs={pdfDocs}
       />
     </div>
   );

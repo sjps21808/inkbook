@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { Ref } from 'preact';
 import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement } from '../db/schema';
+import type { PdfDocs } from '../pdf/render';
 import { PageCanvas, type NewStroke, type PenSettings } from './PageCanvas';
 import type { ImageCache } from './images';
 import type { ToolDef } from './tools';
@@ -30,6 +31,7 @@ interface Props {
   selection: { pageId: string; ids: string[] } | null;
   onSelect(pageId: string, ids: string[]): void;
   handle: Ref<PageListHandle>;
+  pdfDocs: PdfDocs;
 }
 
 const px = (v: number) => `${v}px`;
@@ -42,7 +44,8 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const stickyBottom = () => document.querySelector('.toolbar')?.getBoundingClientRect().bottom ?? 0;
 
 export function PageList(props: Props) {
-  const { pages, elementsOf, load, images, pen, onStroke, tool, option, onCommit, selection, onSelect, handle } = props;
+  const { pages, elementsOf, load, images, pen, onStroke, tool, option, onCommit, selection, onSelect, handle, pdfDocs } =
+    props;
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [range, setRange] = useState<[number, number]>([0, -1]);
@@ -129,6 +132,8 @@ export function PageList(props: Props) {
                 pageId={p.id}
                 images={images}
                 template={p.template}
+                pdf={p.pdf}
+                pdfDocs={pdfDocs}
                 elements={elementsOf(p.id)}
                 pen={pen}
                 onStroke={(s) => onStroke(p.id, s)}
