@@ -124,6 +124,7 @@ Vite + Preact + TS（strict）、安裝所有白名單套件、Vitest、Playwrig
   建立指令：`git -C D:\goodnote worktree add D:\goodnote-m5 -b m5 main`，接著在該目錄執行 `npm ci`。port 用環境變數 `PORT` 傳給 Vite 和 Playwright 的 `webServer`。
 - 並行期間的禁止事項：**修改 schema、新增或升級套件、修改 CLAUDE.md**。確實需要時，停下來問使用者；規格變更的提議先寫在分支上的 `NOTES-Mx.md`。
 - 修改共用插槽（`library/actions.ts`、`editor/tools/index.ts`）時，只能**新增項目**，不可以重排或改寫既有項目。
+  - 例外（2026-10-01 使用者決定）：**只有 M6** 可以在 `ToolDef` 介面上新增**選填欄位**（例如 pointer 處理、一次性動作、工具選項），以支援橡皮擦、套索、圖片、文字；既有欄位與既有項目（筆、螢光筆）不可以修改。
 - 每個小任務開始前先 `git rebase main`，盡早處理衝突。
 - **合併流程**（先完成的先合併）：
   1. `git rebase main`
