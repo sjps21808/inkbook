@@ -1,7 +1,7 @@
-import { BlendMode, degrees, PDFDocument, rgb, type Color, type PDFPage } from 'pdf-lib';
+import { BlendMode, degrees, PDFDocument, rgb, type Color, type PDFImage, type PDFPage } from 'pdf-lib';
 import type { InkDatabase } from '../db/db';
 import { getBlob, listElements, listPages } from '../db/repo';
-import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement, type StrokeElement, type Template } from '../db/schema';
+import { PAGE_HEIGHT, PAGE_WIDTH, type ImageElement, type Page, type PageElement, type StrokeElement, type Template } from '../db/schema';
 import { HIGHLIGHTER_ALPHA, inkOrder, outlineToSvgPath, strokeOutline } from '../editor/stroke';
 import { DOT_RADIUS, TEMPLATE_COLOR, TEMPLATE_LINE_WIDTH, templateShapes } from '../editor/templates';
 import { pdfFit } from '../pdf/fit';
@@ -9,7 +9,25 @@ import { pdfFit } from '../pdf/fit';
 export interface ExportOptions {
   /** 每完成一頁呼叫一次 */
   onProgress?(done: number, total: number): void;
+  /** 把 PNG/JPEG 以外的圖片轉成 PNG（預設用 canvas；測試可替換） */
+  toPng?(data: Blob): Promise<Uint8Array>;
 }
+
+/** 用 canvas 把瀏覽器能解碼的圖片（webp、gif、heic…）轉成 PNG */
+async function canvasToPng(data: Blob): Promise<Uint8Array> {
+  const bmp = await createImageBitmap(data);
+  const cv = document.createElement('canvas');
+  cv.width = bmp.width;
+  cv.height = bmp.height;
+  cv.getContext('2d')!.drawImage(bmp, 0, 0);
+  bmp.close();
+  const png = await new Promise<Blob | null>((r) => cv.toBlob(r, 'image/png'));
+  cv.width = cv.height = 0;
+  return new Uint8Array(await png!.arrayBuffer());
+}
+
+const isPng = (b: Uint8Array) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+const isJpeg = (b: Uint8Array) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
 
 /** '#rrggbb' → pdf-lib 顏色 */
 export function hexColor(hex: string): Color {
@@ -96,9 +114,20 @@ function drawStroke(page: PDFPage, s: StrokeElement): void {
   });
 }
 
-function drawElements(page: PDFPage, els: PageElement[]): void {
+/** 圖片依位置與大小放置；rotation 目前一律為 0，畫面也不使用，所以這裡同樣忽略 */
+function drawImage(page: PDFPage, e: ImageElement, img: PDFImage): void {
+  page.drawImage(img, { x: e.x, y: PAGE_HEIGHT - e.y - e.h, width: e.w, height: e.h });
+}
+
+type ImageLoader = (blobId: string) => Promise<PDFImage | undefined>;
+
+async function drawElements(page: PDFPage, els: PageElement[], image: ImageLoader): Promise<void> {
   for (const e of inkOrder(els)) {
     if (e.type === 'stroke') drawStroke(page, e);
+    else {
+      const img = await image(e.blobId);
+      if (img) drawImage(page, e, img);
+    }
   }
 }
 
@@ -118,12 +147,28 @@ export async function exportNotebookPdf(db: InkDatabase, notebookId: string, opt
     }
     return src;
   };
+  // 同一張圖片只嵌入一次；找不到 blob 或無法解碼時略過（和畫面一樣不畫）
+  const images = new Map<string, Promise<PDFImage | undefined>>();
+  const image: ImageLoader = (blobId) => {
+    let img = images.get(blobId);
+    if (!img) {
+      img = getBlob(db, blobId).then(async (rec) => {
+        if (!rec) return undefined;
+        const bytes = new Uint8Array(await rec.data.arrayBuffer());
+        if (isPng(bytes)) return doc.embedPng(bytes);
+        if (isJpeg(bytes)) return doc.embedJpg(bytes);
+        return doc.embedPng(await (opts.toPng ?? canvasToPng)(rec.data));
+      }).catch(() => undefined); // 無法解碼的圖片畫面上也不會顯示
+      images.set(blobId, img);
+    }
+    return img;
+  };
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     drawTemplate(page, p.template);
     if (p.pdf) await drawPdfPage(doc, page, await source(p.pdf.blobId), p.pdf);
-    drawElements(page, await listElements(db, p.id));
+    await drawElements(page, await listElements(db, p.id), image);
     opts.onProgress?.(i + 1, pages.length);
   }
   return doc.save();

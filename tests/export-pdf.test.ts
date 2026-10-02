@@ -6,7 +6,7 @@ import { degrees, PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, type PD
 import { describe, expect, it } from 'vitest';
 import { openInkDb } from '../src/db/db';
 import { addPage, createNotebook, createPdfNotebook, newId, putElements } from '../src/db/repo';
-import type { StrokeElement } from '../src/db/schema';
+import type { ImageElement, StrokeElement } from '../src/db/schema';
 import { exportNotebookPdf, hexColor, pdfPlacement, type Placement } from '../src/export/exportPdf';
 import { pdfFit } from '../src/pdf/fit';
 
@@ -168,6 +168,74 @@ describe('exportNotebookPdf：PDF 頁', () => {
     });
     expect(formCount).toEqual([1, 1, 0]);
     expect(contentOf(doc.getPage(0))).toMatch(/\/\S+ Do/);
+    db.close();
+  });
+});
+
+// 1×1 的 PNG 與 JPEG
+const PNG = Uint8Array.from(
+  atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
+  (c) => c.charCodeAt(0),
+);
+const JPEG = Uint8Array.from(
+  atob(
+    '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
+  ),
+  (c) => c.charCodeAt(0),
+);
+
+function image(pageId: string, z: number, blobId: string, box = { x: 50, y: 100, w: 200, h: 120 }): ImageElement {
+  return { id: newId(), pageId, z, type: 'image', blobId, rotation: 0, ...box };
+}
+
+/** 頁面用到的 Image XObject 的 Filter */
+function imageFilters(doc: PDFDocument, page: PDFPage): string[] {
+  const xobjects = page.node.Resources()!.lookup(PDFName.of('XObject'));
+  if (!(xobjects instanceof PDFDict)) return [];
+  return xobjects
+    .values()
+    .map((v) => doc.context.lookup(v) as PDFRawStream)
+    .filter((x) => x.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'))
+    .map((x) => String(x.dict.get(PDFName.of('Filter'))))
+    .sort();
+}
+
+describe('exportNotebookPdf：圖片', () => {
+  it('PNG/JPEG 直接嵌入、其他格式轉成 PNG；同一張圖只嵌入一次；壞圖與缺少的 blob 略過', async () => {
+    const db = await open();
+    const { notebook, page } = await createNotebook(db, { title: 'I' });
+    const page2 = await addPage(db, notebook.id, 1, 'blank');
+    const put = (id: string, bytes: Uint8Array, mime: string) =>
+      db.put('blobs', { id, data: new Blob([bytes.buffer as ArrayBuffer], { type: mime }), mime });
+    await put('png', PNG, 'image/png');
+    await put('jpg', JPEG, 'image/jpeg');
+    await put('webp', new Uint8Array([0x52, 0x49, 0x46, 0x46]), 'image/webp');
+    await put('broken', new Uint8Array([1, 2, 3]), 'image/png');
+    await putElements(db, [
+      image(page.id, 0, 'png'),
+      image(page.id, 1, 'jpg'),
+      image(page.id, 2, 'webp'),
+      image(page.id, 3, 'missing'),
+      image(page2.id, 0, 'webp', { x: 10, y: 20, w: 30, h: 40 }),
+    ]);
+    const converted: string[] = [];
+    const toPng = async (data: Blob) => {
+      converted.push(data.type);
+      return PNG;
+    };
+    // broken 不是 PNG/JPEG 開頭，會走轉檔；讓轉檔失敗來模擬瀏覽器無法解碼
+    await putElements(db, [image(page2.id, 1, 'broken')]);
+    const failing = async (data: Blob) => {
+      if (data.type === 'image/png') throw new Error('decode failed');
+      return toPng(data);
+    };
+    const doc = await PDFDocument.load(await exportNotebookPdf(db, notebook.id, { toPng: failing }));
+
+    expect(converted).toEqual(['image/webp']);
+    expect(imageFilters(doc, doc.getPage(0))).toEqual(['/DCTDecode', '/FlateDecode', '/FlateDecode']);
+    expect(imageFilters(doc, doc.getPage(1))).toEqual(['/FlateDecode']);
+    // 第 2 頁的圖片：左上 (10, 20)、30×40 → PDF 座標左下 (10, 842-20-40)
+    expect(contentOf(doc.getPage(1))).toMatch(/1 0 0 1 10 782 cm[\s\S]*30 0 0 40 0 0 cm/);
     db.close();
   });
 });
