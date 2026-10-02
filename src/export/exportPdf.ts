@@ -1,9 +1,12 @@
-import { BlendMode, degrees, PDFDocument, rgb, type Color, type PDFImage, type PDFPage } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+import { BlendMode, degrees, PDFDocument, rgb, type Color, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
 import type { InkDatabase } from '../db/db';
 import { getBlob, listElements, listPages } from '../db/repo';
-import { PAGE_HEIGHT, PAGE_WIDTH, type ImageElement, type Page, type PageElement, type StrokeElement, type Template } from '../db/schema';
+import { PAGE_HEIGHT, PAGE_WIDTH, type ImageElement, type Page, type PageElement, type StrokeElement, type Template, type TextElement } from '../db/schema';
 import { HIGHLIGHTER_ALPHA, inkOrder, outlineToSvgPath, strokeOutline } from '../editor/stroke';
+import { TEXT_LINE_HEIGHT } from '../editor/geometry';
 import { DOT_RADIUS, TEMPLATE_COLOR, TEMPLATE_LINE_WIDTH, templateShapes } from '../editor/templates';
+import { wrapText } from '../editor/text';
 import { pdfFit } from '../pdf/fit';
 
 export interface ExportOptions {
@@ -11,6 +14,14 @@ export interface ExportOptions {
   onProgress?(done: number, total: number): void;
   /** 把 PNG/JPEG 以外的圖片轉成 PNG（預設用 canvas；測試可替換） */
   toPng?(data: Blob): Promise<Uint8Array>;
+  /** 讀取 Noto Sans TC（預設從同源取得，service worker 已預先快取；測試可替換） */
+  loadFont?(): Promise<Uint8Array>;
+}
+
+async function fetchFont(): Promise<Uint8Array> {
+  const res = await fetch(`${import.meta.env.BASE_URL}fonts/NotoSansTC-Regular.ttf`);
+  if (!res.ok) throw new Error(`字型載入失敗 ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 /** 用 canvas 把瀏覽器能解碼的圖片（webp、gif、heic…）轉成 PNG */
@@ -119,15 +130,41 @@ function drawImage(page: PDFPage, e: ImageElement, img: PDFImage): void {
   page.drawImage(img, { x: e.x, y: PAGE_HEIGHT - e.y - e.h, width: e.w, height: e.h });
 }
 
+/**
+ * 文字框：用 Noto Sans TC（subset）輸出真正的文字，可以搜尋與複製。
+ * 斷行與畫面相同（wrapText）；行高 1.4，字形在行內垂直置中（和 CSS line-height 一樣）。
+ */
+function drawText(page: PDFPage, e: TextElement, font: PDFFont): void {
+  const size = e.fontSize;
+  const lh = size * TEXT_LINE_HEIGHT;
+  const ascent = font.heightAtSize(size, { descender: false });
+  const total = font.heightAtSize(size);
+  const color = hexColor(e.color);
+  wrapText((t) => font.widthOfTextAtSize(t, size), e.content, e.w).forEach((line, i) => {
+    if (!line) return;
+    const baseline = e.y + lh * i + (lh - total) / 2 + ascent;
+    page.drawText(line, { x: e.x, y: PAGE_HEIGHT - baseline, size, font, color });
+  });
+}
+
 type ImageLoader = (blobId: string) => Promise<PDFImage | undefined>;
 
-async function drawElements(page: PDFPage, els: PageElement[], image: ImageLoader): Promise<void> {
+/** 和畫面相同的分層：ink 圖層（螢光筆在最底層），文字在最上層（overlay） */
+async function drawElements(
+  page: PDFPage,
+  els: PageElement[],
+  image: ImageLoader,
+  font: () => Promise<PDFFont>,
+): Promise<void> {
   for (const e of inkOrder(els)) {
     if (e.type === 'stroke') drawStroke(page, e);
     else {
       const img = await image(e.blobId);
       if (img) drawImage(page, e, img);
     }
+  }
+  for (const e of els) {
+    if (e.type === 'text') drawText(page, e, await font());
   }
 }
 
@@ -163,12 +200,21 @@ export async function exportNotebookPdf(db: InkDatabase, notebookId: string, opt
     }
     return img;
   };
+  // 有文字時才載入字型（約 7MB）
+  let fontP: Promise<PDFFont> | null = null;
+  const font = () => {
+    fontP ??= (opts.loadFont ?? fetchFont)().then((bytes) => {
+      doc.registerFontkit(fontkit);
+      return doc.embedFont(bytes, { subset: true });
+    });
+    return fontP;
+  };
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     drawTemplate(page, p.template);
     if (p.pdf) await drawPdfPage(doc, page, await source(p.pdf.blobId), p.pdf);
-    await drawElements(page, await listElements(db, p.id), image);
+    await drawElements(page, await listElements(db, p.id), image, font);
     opts.onProgress?.(i + 1, pages.length);
   }
   return doc.save();

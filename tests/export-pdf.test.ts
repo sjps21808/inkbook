@@ -6,7 +6,7 @@ import { degrees, PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, type PD
 import { describe, expect, it } from 'vitest';
 import { openInkDb } from '../src/db/db';
 import { addPage, createNotebook, createPdfNotebook, newId, putElements } from '../src/db/repo';
-import type { ImageElement, StrokeElement } from '../src/db/schema';
+import type { ImageElement, StrokeElement, TextElement } from '../src/db/schema';
 import { exportNotebookPdf, hexColor, pdfPlacement, type Placement } from '../src/export/exportPdf';
 import { pdfFit } from '../src/pdf/fit';
 
@@ -236,6 +236,77 @@ describe('exportNotebookPdf：圖片', () => {
     expect(imageFilters(doc, doc.getPage(1))).toEqual(['/FlateDecode']);
     // 第 2 頁的圖片：左上 (10, 20)、30×40 → PDF 座標左下 (10, 842-20-40)
     expect(contentOf(doc.getPage(1))).toMatch(/1 0 0 1 10 782 cm[\s\S]*30 0 0 40 0 0 cm/);
+    db.close();
+  });
+});
+
+// 專案沒有 @types/node；用變數動態 import 避免 tsc 解析模組型別
+const nodeFs = 'node:fs/promises';
+const readFile = async (path: string): Promise<Uint8Array> =>
+  new Uint8Array(await (await import(/* @vite-ignore */ nodeFs)).readFile(path));
+const loadFont = () => readFile('public/fonts/NotoSansTC-Regular.ttf');
+
+/** 用 pdf.js 取出每頁的文字項目 */
+async function extractText(bytes: Uint8Array): Promise<{ str: string; x: number; y: number; h: number }[][]> {
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+  const pages = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const content = await (await doc.getPage(i)).getTextContent();
+    pages.push(
+      content.items
+        .filter((it) => 'str' in it && it.str)
+        .map((it) => {
+          const t = it as { str: string; transform: number[]; height: number };
+          return { str: t.str, x: t.transform[4], y: t.transform[5], h: t.height };
+        }),
+    );
+  }
+  await doc.loadingTask.destroy();
+  return pages;
+}
+
+function text(pageId: string, z: number, content: string, box = { x: 60, y: 100, w: 400 }): TextElement {
+  return { id: newId(), pageId, z, type: 'text', content, fontSize: 20, color: '#1c1c1e', ...box };
+}
+
+describe('exportNotebookPdf：文字', () => {
+  it('嵌入 Noto Sans TC subset，中英文都能取出；斷行與換行保留', async () => {
+    const db = await open();
+    const { notebook, page } = await createNotebook(db, { title: 'T' });
+    await putElements(db, [
+      text(page.id, 0, '你好，InkBook 筆記 123\n第二行'),
+      // 寬度只夠放 3 個 20pt 的全形字 → 斷成 2 行
+      text(page.id, 1, '一二三四五六', { x: 60, y: 300, w: 61 }),
+    ]);
+    const bytes = await exportNotebookPdf(db, notebook.id, { loadFont });
+    // subset：輸出遠小於 7MB 的完整字型
+    expect(bytes.length).toBeLessThan(200_000);
+
+    const [items] = await extractText(bytes);
+    expect(items.map((i) => i.str)).toEqual(['你好，InkBook 筆記 123', '第二行', '一二三', '四五六']);
+    // 左邊對齊文字框；同一個文字框的行距 = 20 × 1.4 = 28pt
+    expect(items[0].x).toBeCloseTo(60);
+    expect(items[0].y - items[1].y).toBeCloseTo(28);
+    expect(items[2].y - items[3].y).toBeCloseTo(28);
+    // 第一行基線在文字框頂端往下約一個字高之內
+    const baselineFromTop = 842 - items[0].y - 100;
+    expect(baselineFromTop).toBeGreaterThan(14);
+    expect(baselineFromTop).toBeLessThan(28);
+    db.close();
+  });
+
+  it('沒有文字時不載入字型', async () => {
+    const db = await open();
+    const { notebook } = await createNotebook(db, { title: 'T' });
+    let loaded = 0;
+    await exportNotebookPdf(db, notebook.id, {
+      loadFont: () => {
+        loaded++;
+        return loadFont();
+      },
+    });
+    expect(loaded).toBe(0);
     db.close();
   });
 });
