@@ -6,7 +6,7 @@
 ## 1. 背景與不可改變的前提
 - 開發者只有 Windows，沒有 Mac，也不付費 → 採用 PWA，部署到 GitHub Pages，iPad 用 Safari「加入主畫面」後使用。
 - **筆記資料只存在 iPad 本機的 IndexedDB**，不上傳。App 不能呼叫任何外部 API，也不能接 analytics。
-- CSP：`default-src 'self'`，只為 pdf.js worker 和 `blob:` 放行必要的來源。
+- CSP：`default-src 'self'`，只為 pdf.js worker 和 `blob:` 放行必要的來源；`script-src` 另加 `'wasm-unsafe-eval'`，只允許編譯 WebAssembly（pdf.js 的 JBIG2、JPEG2000 解碼器與色彩管理），仍然禁止 JS `eval`（2026-10-01 使用者同意）。
 - **必須能完全離線**：第一次載入後，飛航模式下也能開啟、新增筆記、書寫、匯出。
 - 目標裝置：iPadOS 17 以上，以 4GB RAM 的 iPad 為最低標準。
 - 網址：`https://sjps21808.github.io/inkbook/`
@@ -97,7 +97,7 @@ Vite + Preact + TS（strict）、安裝所有白名單套件、Vitest、Playwrig
 - 距離上次備份超過 7 天時，書架頂端顯示提示列。
 
 ### M5 匯入 PDF（並行）
-- pdf.js 讀取 → 每頁建立 Page `{pdf:{blobId,pageNo}}`，不預先渲染；不是 A4 的頁面等比例縮放到 A4 寬度。
+- pdf.js 讀取 → 每頁建立 Page `{pdf:{blobId,pageNo}}`，不預先渲染；不是 A4 的頁面等比例縮放到 A4 寬度、靠上對齊；**縮放後比 A4 還高的頁面，改成整頁放得下並水平置中**（2026-10-01 使用者決定）。位置一律由 `src/pdf/fit.ts` 的 `pdfFit()` 計算，畫面與匯出共用。
 - 入口：在 `library/actions.ts` 加一項。
 - 上限 500 頁 / 100MB，超過時提示。效能 E2E：產生一份 500 頁 PDF，匯入要在 10 秒內完成。
 
@@ -108,7 +108,7 @@ Vite + Preact + TS（strict）、安裝所有白名單套件、Vitest、Playwrig
 - 每個工具在 `editor/tools/index.ts` 各加一行。
 
 ### M7 匯出 PDF、深色模式
-- pdf-lib：PDF 頁用 `copyPages`；模板線條用向量繪製；stroke 用 perfect-freehand outline 轉成 SVG path 後以 `drawSvgPath` 寫入；圖片嵌入；**文字嵌入 Noto Sans TC（fontkit subset）**，要能搜尋和複製。
+- pdf-lib：PDF 頁用 `embedPage` 放到 A4 頁上、位置用 `pdfFit()`（2026-10-02 使用者決定，取代 `copyPages`，讓非 A4 頁與筆跡座標對齊）；模板線條用向量繪製；stroke 用 perfect-freehand outline 轉成 SVG path 後以 `drawSvgPath` 寫入；圖片嵌入；**文字嵌入 Noto Sans TC（fontkit subset）**，要能搜尋和複製。
 - 測試：匯出後用 pdf-lib 或 pdf.js 解析回來，檢查頁數、文字內容可以取出。
 - 深色模式：UI 跟隨 `prefers-color-scheme`，頁面維持白紙。
 
@@ -139,6 +139,7 @@ Vite + Preact + TS（strict）、安裝所有白名單套件、Vitest、Playwrig
 - **Playwright WebKit**：用 `dispatchEvent(new PointerEvent(..., {pointerType:'pen', pressure}))` 模擬 Pencil，並抽樣 canvas 像素驗證；涵蓋書架、翻頁、匯入、匯出等流程，以及效能測試。
 - **Windows 上無法驗證的項目（交給使用者在 iPad 實測，不可以宣稱已通過）**：Pencil 延遲與手感、防手掌誤觸、手指捲動與縮放、加入主畫面、離線、更新提示、`navigator.share`。
 - 開發模式（`import.meta.env.DEV`）把 mouse 當成 pen。
+- WebKit 的臨時 context 不能把 Blob 存進 IndexedDB；需要存 Blob 的 E2E 使用 `e2e/helpers/persistent.ts` 的 `test`。
 
 ## 8. 前置 tag 檢查表
 | 要開始 | 必須存在的 tag |
