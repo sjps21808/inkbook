@@ -82,9 +82,9 @@ html, body {
   height: 100%;
 }
 
-/* 螢光筆與底下的模板／PDF 相乘混合 */
-.page canvas.ink,
-.page canvas.live {
+/* 螢光筆與底下的模板／PDF 相乘混合；混合圖層的合成很貴，只在有螢光筆時開啟（見 PageCanvas） */
+.page[data-blend] canvas.ink,
+.page[data-blend] canvas.live {
   mix-blend-mode: multiply;
 }
 

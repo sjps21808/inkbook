@@ -315,6 +315,8 @@ export function PageCanvas(props: Props) {
     };
   }, []);
 
+  // 只有這頁有螢光筆、或正在用螢光筆時才需要 multiply（純筆畫在白紙上結果相同）
+  const blend = props.pen.tool === 'highlighter' || !!shown?.some((e) => e.type === 'stroke' && e.tool === 'highlighter');
   const box = props.selection.length ? selectionBounds(shown ?? [], props.selection) : null;
 
   /** 結束編輯：空白 = 刪除（新的就不存），內容有變才存檔 */
@@ -331,7 +333,13 @@ export function PageCanvas(props: Props) {
   };
 
   return (
-    <div class="page" ref={pageRef} data-index={index} data-ready={elements ? '' : undefined}>
+    <div
+      class="page"
+      ref={pageRef}
+      data-index={index}
+      data-ready={elements ? '' : undefined}
+      data-blend={blend ? '' : undefined}
+    >
       <canvas class="bg" ref={bgRef} />
       <canvas class="ink" ref={inkRef} />
       <canvas class="live" ref={liveRef} />

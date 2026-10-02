@@ -84,3 +84,18 @@ test('畫完立刻復原，筆畫不會復活', async ({ page }) => {
   await page.waitForTimeout(300);
   expect(await elementCount(page)).toBe(0);
 });
+
+test('multiply 混合只在有螢光筆或正在用螢光筆時開啟', async ({ page }) => {
+  const blend = () =>
+    page.locator('.page[data-index="0"] canvas.ink').evaluate((el) => getComputedStyle(el).mixBlendMode);
+  await drawStroke(page, hLine(0.3));
+  expect(await blend()).toBe('normal');
+  await tool(page, '螢光筆').click();
+  expect(await blend()).toBe('multiply');
+  await drawStroke(page, hLine(0.5));
+  await expect.poll(() => elementCount(page)).toBe(2);
+  await tool(page, '筆').click();
+  expect(await blend()).toBe('multiply'); // 頁面上有螢光筆
+  await tool(page, '復原').click();
+  await expect.poll(blend).toBe('normal');
+});
