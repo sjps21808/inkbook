@@ -58,16 +58,20 @@ export function drawStroke(ctx: CanvasRenderingContext2D, s: StrokeElement, scal
 /** 依 blobId 取得已解碼的圖片；還沒解碼時回傳 undefined（略過不畫） */
 export type ImageSource = (blobId: string) => CanvasImageSource | undefined;
 
-/** 重畫整個 ink 圖層：螢光筆一律在最底層，筆畫與圖片依 z 排序（文字在 overlay） */
+/** ink 圖層的繪製順序：螢光筆一律在最底層，筆畫與圖片依 z 排序（文字不在 ink 圖層；匯出 PDF 共用） */
+export function inkOrder(els: PageElement[]): (StrokeElement | ImageElement)[] {
+  const drawn = els.filter((e): e is StrokeElement | ImageElement => e.type !== 'text');
+  const rank = (e: StrokeElement | ImageElement) => (e.type === 'stroke' && e.tool === 'highlighter' ? 0 : 1);
+  return drawn.sort((a, b) => rank(a) - rank(b) || a.z - b.z);
+}
+
+/** 重畫整個 ink 圖層（文字在 overlay） */
 export function renderInk(ctx: CanvasRenderingContext2D, els: PageElement[], scale: number, image?: ImageSource): void {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.restore();
-  const drawn = els.filter((e): e is StrokeElement | ImageElement => e.type !== 'text');
-  const rank = (e: StrokeElement | ImageElement) => (e.type === 'stroke' && e.tool === 'highlighter' ? 0 : 1);
-  drawn.sort((a, b) => rank(a) - rank(b) || a.z - b.z);
-  for (const e of drawn) {
+  for (const e of inkOrder(els)) {
     if (e.type === 'stroke') drawStroke(ctx, e, scale);
     else {
       const src = image?.(e.blobId);
