@@ -1,9 +1,50 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bgPixel, openNewNotebook } from './helpers/pen';
+import { bgPixel, openNewNotebook, waitReady } from './helpers/pen';
 
-/** 元素計算後的背景色 */
-const bgColor = (page: Page, selector: string) =>
-  page.locator(selector).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+// 專案沒有 @types/node
+declare const Buffer: { from(d: Uint8Array): { toString(enc: 'base64'): string } };
+
+/**
+ * 截圖上實際畫出的顏色（每個像素 [r, g, b]）。
+ * 不用 getComputedStyle：Playwright WebKit 偶爾回報過時的值（畫面其實正確），測試會不穩定
+ */
+async function painted(page: Page, clip: { x: number; y: number; width: number; height: number }) {
+  const b64 = Buffer.from(await page.screenshot({ clip })).toString('base64');
+  return page.evaluate(async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const img = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+    const c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, c.width, c.height).data;
+    const px: [number, number, number][] = [];
+    for (let i = 0; i < d.length; i += 4) px.push([d[i], d[i + 1], d[i + 2]]);
+    return px;
+  }, b64);
+}
+
+/** 元素的背景色：取元素上緣往下 3px、水平置中的像素（避開文字與圓角）；body 取視窗左下角 */
+async function bgColor(page: Page, selector: string): Promise<string> {
+  let x: number, y: number;
+  if (selector === 'body') {
+    const vp = page.viewportSize()!;
+    [x, y] = [2, vp.height - 2];
+  } else {
+    const box = (await page.locator(selector).first().boundingBox())!;
+    [x, y] = [Math.floor(box.x + box.width / 2), Math.floor(box.y + 3)];
+  }
+  const [[r, g, b]] = await painted(page, { x, y, width: 1, height: 1 });
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+/** 元素範圍內最亮的像素亮度（深色背景上的淺色文字會是最亮的） */
+async function brightest(page: Page, selector: string): Promise<number> {
+  const box = (await page.locator(selector).first().boundingBox())!;
+  const px = await painted(page, box);
+  return Math.max(...px.map(([r, g, b]) => Math.min(r, g, b)));
+}
 
 const WHITE = 'rgb(255, 255, 255)';
 
@@ -15,9 +56,8 @@ test.describe('深色模式', () => {
     expect(await bgColor(page, 'body')).toBe('rgb(0, 0, 0)');
     expect(await bgColor(page, '.toolbar')).toBe('rgb(22, 22, 24)');
     expect(await bgColor(page, '.toolbar button')).toBe('rgb(28, 28, 30)');
-    expect(await page.locator('.toolbar button').first().evaluate((el) => getComputedStyle(el).color)).toBe(
-      'rgb(242, 242, 247)',
-    );
+    // 按鈕文字是淺色（#f2f2f7）
+    expect(await brightest(page, '.toolbar button')).toBeGreaterThan(200);
 
     expect(await bgColor(page, '.page')).toBe(WHITE);
     expect(await bgPixel(page, [300, 400])).toEqual([255, 255, 255, 255]);
@@ -44,4 +84,38 @@ test('淺色模式維持原本的配色', async ({ page }) => {
   expect(await bgColor(page, 'body')).toBe('rgb(242, 242, 245)');
   expect(await bgColor(page, '.toolbar')).toBe('rgb(249, 249, 251)');
   expect(await bgColor(page, '.page')).toBe(WHITE);
+});
+
+const theme = (page: Page) => page.getByRole('combobox', { name: '外觀' });
+
+test.describe('外觀選單', () => {
+  test('系統深色時選「淺色」→ UI 變淺色；改回「跟隨系統」→ 深色', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await openNewNotebook(page);
+    await expect(theme(page)).toHaveValue('system');
+    await theme(page).selectOption({ label: '淺色' });
+    expect(await bgColor(page, 'body')).toBe('rgb(242, 242, 245)');
+    expect(await bgColor(page, '.toolbar')).toBe('rgb(249, 249, 251)');
+    await theme(page).selectOption({ label: '跟隨系統' });
+    expect(await bgColor(page, 'body')).toBe('rgb(0, 0, 0)');
+  });
+
+  test('系統淺色時選「深色」→ UI 變深色、頁面仍是白紙；重新整理後設定還在', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await openNewNotebook(page);
+    await theme(page).selectOption({ label: '深色' });
+    expect(await bgColor(page, 'body')).toBe('rgb(0, 0, 0)');
+    expect(await bgColor(page, '.toolbar')).toBe('rgb(22, 22, 24)');
+    expect(await bgColor(page, '.page')).toBe(WHITE);
+
+    await page.reload();
+    await waitReady(page);
+    await expect(theme(page)).toHaveValue('dark');
+    expect(await bgColor(page, 'body')).toBe('rgb(0, 0, 0)');
+    expect(await bgPixel(page, [300, 400])).toEqual([255, 255, 255, 255]);
+
+    await page.getByRole('button', { name: '‹ 書架' }).click();
+    await expect(theme(page)).toHaveValue('dark');
+    expect(await bgColor(page, '.topbar')).toBe('rgb(28, 28, 30)');
+  });
 });

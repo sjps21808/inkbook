@@ -5,6 +5,7 @@ import { Editor } from './editor/Editor';
 import { Library } from './library/Library';
 import { UpdatePrompt } from './pwa/UpdatePrompt';
 import { notebookHash, useRoute } from './router';
+import { ThemeSelect } from './ThemeSelect';
 
 function NotebookView({ db, id }: { db: InkDatabase; id: string }) {
   const [opened, setOpened] = useState<OpenedNotebook | null | undefined>(undefined);
@@ -38,6 +39,7 @@ export function App() {
       <header class="topbar">
         <h1>InkBook</h1>
         <span class="version">版本 {__APP_VERSION__}</span>
+        <ThemeSelect />
         <UpdatePrompt />
       </header>
       <main>

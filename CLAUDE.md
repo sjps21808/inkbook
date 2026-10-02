@@ -110,7 +110,7 @@ Vite + Preact + TS（strict）、安裝所有白名單套件、Vitest、Playwrig
 ### M7 匯出 PDF、深色模式
 - pdf-lib：PDF 頁用 `embedPage` 放到 A4 頁上、位置用 `pdfFit()`（2026-10-02 使用者決定，取代 `copyPages`，讓非 A4 頁與筆跡座標對齊）；模板線條用向量繪製；stroke 用 perfect-freehand outline 轉成 SVG path 後以 `drawSvgPath` 寫入；圖片嵌入；**文字嵌入 Noto Sans TC（fontkit subset）**，要能搜尋和複製。
 - 測試：匯出後用 pdf-lib 或 pdf.js 解析回來，檢查頁數、文字內容可以取出。
-- 深色模式：UI 跟隨 `prefers-color-scheme`，頁面維持白紙。
+- 深色模式：UI 預設跟隨 `prefers-color-scheme`，可以在頂端列的「外觀」選單手動指定淺色或深色（存在 `localStorage`，2026-10-03 使用者決定）；頁面維持白紙。
 
 ## 6. 並行開發（只適用 M4 ∥ M5 ∥ M6）
 - `D:\goodnote` 固定在 main，只用來合併。worktree 配置：

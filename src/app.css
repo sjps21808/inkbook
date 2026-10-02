@@ -15,9 +15,10 @@
   --reminder-border: #f0d58a;
 }
 
-/* 深色模式：只改 UI，頁面維持白紙（CLAUDE.md §5 M7） */
+/* 深色模式：只改 UI，頁面維持白紙（CLAUDE.md §5 M7）。
+   預設跟隨系統；「外觀」選單可以指定 <html data-theme="light|dark">（見 theme.ts） */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #000;
     --fg: #f2f2f7;
     --fg-2: #c7c7cc;
@@ -32,6 +33,27 @@
     --reminder-bg: #3a2f12;
     --reminder-border: #6b5520;
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000;
+  --fg: #f2f2f7;
+  --fg-2: #c7c7cc;
+  --muted: #98989f;
+  --muted-2: #636366;
+  --surface: #1c1c1e;
+  --surface-2: #161618;
+  --sidebar: #111113;
+  --border: #3a3a3c;
+  --more-bg: rgba(28, 28, 30, 0.85);
+  --reminder-fg: #ffd98a;
+  --reminder-bg: #3a2f12;
+  --reminder-border: #6b5520;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 html, body {
@@ -579,4 +601,20 @@ textarea,
 
 .backup-reminder span {
   flex: 1;
+}
+
+.theme-select {
+  margin-left: auto;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 15px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* 「有新版本」維持在最右邊 */
+.theme-select + .update-btn {
+  margin-left: 8px;
 }
