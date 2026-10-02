@@ -51,7 +51,7 @@ export async function shareOrDownload(file: File): Promise<boolean> {
   return true;
 }
 
-const formatSize = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+export const formatSize = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 function Message({ title, text, close }: { title: string; text: string; close(): void }) {
   return (

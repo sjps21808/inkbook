@@ -13,6 +13,7 @@ import {
   type PageSnapshot,
 } from '../db/repo';
 import type { Notebook, Page, PageElement, StrokeElement, Template, TextElement } from '../db/schema';
+import { runExport } from '../export/ExportDialog';
 import { PdfDocs } from '../pdf/render';
 import { transformElement } from './geometry';
 import { ImageCache } from './images';
@@ -282,6 +283,16 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         <div class="group">
           <button aria-pressed={showThumbs} onClick={() => setShowThumbs((s) => !s)}>
             頁面
+          </button>
+        </div>
+        <div class="group">
+          <button
+            onClick={() => {
+              blurEditing(); // 編輯中的文字先存檔
+              runExport(db, notebook);
+            }}
+          >
+            匯出 PDF
           </button>
         </div>
         <PageActions
