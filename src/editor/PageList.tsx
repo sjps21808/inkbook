@@ -34,6 +34,8 @@ interface Props {
   onSelect(pageId: string, ids: string[]): void;
   handle: Ref<PageListHandle>;
   pdfDocs: PdfDocs;
+  /** 第一次顯示的頁面 index */
+  initialIndex: number;
   /** 目前頁改變（含第一次顯示） */
   onPageChange(index: number): void;
 }
@@ -81,12 +83,13 @@ export function PageList(props: Props) {
     handle,
     pdfDocs,
     onPageChange,
+    initialIndex,
   } = props;
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   // 版面視窗高度（clientHeight 不受雙指縮放影響）與頂端安全區
   const [viewport, setViewport] = useState({ h: 0, safe: 0 });
-  const [current, setCurrent] = useState(0);
+  const [current, setCurrent] = useState(initialIndex);
   const [flipping, setFlipping] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const pageW = fitPageWidth(width, viewport.h, viewport.safe);

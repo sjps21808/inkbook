@@ -118,3 +118,18 @@ test('選單收起時翻頁按鈕隱藏，仍可滑動翻頁', async ({ page }) 
   await swipe(page, 1);
   expect(await currentPage(page)).toBe(1);
 });
+
+test('重新開啟筆記本時翻到上次看的頁面', async ({ page }) => {
+  await swipe(page, 1);
+  await swipe(page, 1);
+  expect(await currentPage(page)).toBe(2);
+  await page.reload();
+  await waitReady(page, 2);
+  expect(await currentPage(page)).toBe(2);
+  await expect(page.locator('.page-no')).toHaveText('3 / 3');
+  // 從書架重新開啟也一樣
+  await page.getByRole('button', { name: '‹ 書架' }).click();
+  await page.getByText('測試筆記').click();
+  await waitReady(page, 2);
+  expect(await currentPage(page)).toBe(2);
+});

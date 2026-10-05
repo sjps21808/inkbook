@@ -18,6 +18,7 @@ import { PdfDocs } from '../pdf/render';
 import { transformElement } from './geometry';
 import { ImageCache } from './images';
 import { loadCollapsed, saveCollapsed } from './chrome';
+import { loadLastPage, saveLastPage } from './lastPage';
 import { blurEditing } from './text';
 import { elementsCommand, History, type Command, type ElementStore } from './history';
 import { PageActions } from './PageActions';
@@ -47,7 +48,8 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   const [versions, setVersions] = useState<Record<string, number>>({});
   const [showThumbs, setShowThumbs] = useState(false);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
-  const [current, setCurrent] = useState(0);
+  const [initialIndex] = useState(() => loadLastPage(notebook.id, initialPages));
+  const [current, setCurrent] = useState(initialIndex);
   const cacheRef = useRef<Cache>(cache);
   const loading = useRef(new Set<string>());
   const listRef = useRef<PageListHandle>(null);
@@ -269,6 +271,12 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     return () => root.removeAttribute('data-chrome');
   }, [collapsed]);
 
+  // 記住目前頁（頁面增刪後同一個 index 可能換成別頁，所以也跟著 pages 更新）
+  useEffect(() => {
+    const i = Math.min(current, pages.length - 1);
+    if (i >= 0) saveLastPage(notebook.id, pages[i].id, i);
+  }, [current, pages]);
+
   const toggleChrome = () => {
     saveCollapsed(!collapsed);
     setCollapsed(!collapsed);
@@ -381,6 +389,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         onSelect={(pageId, ids) => setSelection(ids.length ? { pageId, ids } : null)}
         pdfDocs={pdfDocs}
         onPageChange={setCurrent}
+        initialIndex={initialIndex}
       />
     </div>
   );
