@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 import { inkPixel, openNewNotebook, seedPages, waitReady } from './helpers/pen';
 
 test('300 頁筆記本從第一頁翻到最後一頁不出錯', async ({ page }) => {
-  test.setTimeout(180_000);
+  // CI（ubuntu，無 GPU）上翻頁動畫讓 300 次翻頁超過 180 秒；這裡驗證的是不出錯，不是速度
+  test.setTimeout(300_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));

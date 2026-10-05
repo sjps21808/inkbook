@@ -121,6 +121,7 @@ html, body {
 .pages-track {
   position: absolute;
   inset: 0;
+  will-change: transform; /* 獨立圖層：翻頁動畫只平移、不重繪頁面 */
 }
 
 .pages-track.flipping {
