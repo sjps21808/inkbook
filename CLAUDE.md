@@ -83,9 +83,9 @@ Vite + Preact + TS（strict）、安裝所有白名單套件、Vitest、Playwrig
 - 啟動時呼叫 `navigator.storage.persist()`。
 
 ### M3 多頁、虛擬捲動、插槽
-- A4 頁面垂直捲動，採**虛擬捲動**：DOM 只保留可見頁前後各 2 頁；canvas 解析度要設上限。
-- 新增、刪除、拖曳排序頁面（可以 undo；undo 時自動捲到對應頁面）；四種模板；縮圖側欄（延遲產生並快取）。
-- 效能 E2E：300 頁筆記本從頭捲到尾不出錯。
+- A4 頁面**左右翻頁**（一次顯示一頁，見 §10 2026-10-05 決策）：DOM 只保留目前頁前後各 1 頁；canvas 解析度要設上限。
+- 新增、刪除、拖曳排序頁面（可以 undo；undo 時自動翻到對應頁面）；四種模板；縮圖側欄（延遲產生並快取）。
+- 效能 E2E：300 頁筆記本從第一頁翻到最後一頁不出錯。
 - **為並行開發準備的插槽**：
   - 最小版書架（筆記本列表、新增筆記本），加上一個空的**動作列** `library/actions.ts`（陣列）
   - 工具列由 `editor/tools/index.ts` 的工具陣列產生
@@ -163,6 +163,8 @@ Vite + Preact + TS（strict）、安裝所有白名單套件、Vitest、Playwrig
 ## 10. 決策與實測紀錄
 - M-1 結果（2026-10-01）：**通過**。iPad 經 GitHub Pages（`sjps21808/inkbook-spike`，與正式網址無關）實測：跟筆、防手掌誤觸、捲動縮放、長按與雙擊都 OK；壓感粗細變化不合格。
 - 決策（2026-10-01，使用者）：**不做壓感**，線寬固定，由選單的 3 段粗細決定。schema 的 `points` 仍保留 x,y,pressure 格式（schema 不變），渲染時忽略 pressure。
+- 決策（2026-10-05，使用者）：編輯頁上方選單（頂端列 + 工具列）可以收起，收起狀態存在 `localStorage`；展開時浮在頁面上方、不改變頁面大小；頁面大小讓整頁（上下緣）放得進螢幕高度。
+- 決策（2026-10-05，使用者）：**頁面改成左右翻頁**，取代垂直捲動。一次顯示一頁；單指左右滑動翻頁（放開後約 200ms 滑動動畫，不跟手），雙指放大時不翻頁，Pencil 書寫中不翻頁；第一頁／最後一頁再翻只彈一下、不新增頁面；工具列有「‹ n / N ›」（收起時隱藏）；每本筆記本最後看的頁面存在 `localStorage`，重新開啟時翻到該頁。
 
 ## 11. 資料模型（schema v1，M2 一次定義完成）
 座標一律使用 A4 PDF 單位 595×842 pt。
@@ -179,7 +181,7 @@ Blob     { id, data: Blob, mime }
 Meta     { key, value }   // schemaVersion、lastBackupAt
 ```
 渲染分層：`canvas.bg`（模板或 PDF）/ `canvas.ink`（已完成元素；螢光筆在最底層並用 multiply 混合）/ `canvas.live`（目前正在畫的一筆）/ `div.overlay`（文字框、選取框）。
-輸入：`pen` 用來繪圖並 `preventDefault`；`touch` 使用原生捲動和縮放（`touch-action: pan-x pan-y pinch-zoom`）；有 `getCoalescedEvents` 時就使用；關閉文字選取、長按選單和雙擊放大。
+輸入：`pen` 用來繪圖並 `preventDefault`；`touch` 單指左右滑動翻頁、雙指使用原生縮放（`touch-action: pan-x pan-y pinch-zoom`，放大後原生平移）；有 `getCoalescedEvents` 時就使用；關閉文字選取、長按選單和雙擊放大。
 
 ## 12. 已知限制（不在範圍內）
 - Pencil 雙擊切換工具、Pencil Pro 擠壓手勢：Safari 收不到這些事件
