@@ -124,8 +124,34 @@ html, body {
   will-change: transform; /* 獨立圖層：翻頁動畫只平移、不重繪頁面 */
 }
 
+/* 減速曲線：一開始快、最後慢慢停下（與 PageList FLIP_MS 一致） */
 .pages-track.flipping {
-  transition: transform 200ms ease-out;
+  transition: transform 280ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 最後一頁往後拖夠遠：右側露出「＋ 新增頁面」 */
+.add-hint {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 64px;
+  padding: 8px 0;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 120ms;
+  pointer-events: none;
+}
+
+.pages[data-add-armed] .add-hint {
+  opacity: 1;
+  color: #0a84ff;
+  border-color: #0a84ff;
 }
 
 .page-slot {

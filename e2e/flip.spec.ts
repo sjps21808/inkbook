@@ -187,3 +187,88 @@ test('只點一下不翻頁', async ({ page }) => {
   ]);
   expect(await currentPage(page)).toBe(0);
 });
+
+/** 第 index 頁左緣在畫面上的 x（拖動中不加動畫，可以直接比較位移） */
+const pageLeft = (page: Page, index: number) =>
+  page.evaluate((i) => document.querySelector(`.page[data-index="${i}"]`)!.getBoundingClientRect().left, index);
+const nextFrame = (page: Page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+const pageWidth = (page: Page) =>
+  page.evaluate(() => document.querySelector('.page')!.getBoundingClientRect().width);
+
+test('拖動時頁面跟著手指走，沒翻頁時放開彈回原位', async ({ page }) => {
+  const w = await pageWidth(page);
+  const left0 = await pageLeft(page, 0);
+  const d = 12 / w; // 拖 12px（超過 8px 才開始跟手）
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.6, fy: 0.5 },
+    { type: 'pointermove', pointerType: 'touch', id: 11, fx: 0.6 - d, fy: 0.5 },
+  ]);
+  await nextFrame(page);
+  expect(await pageLeft(page, 0)).toBeCloseTo(left0 - 12, 0);
+  // 下一頁跟著一起移動
+  expect(await pageLeft(page, 1)).toBeLessThan(left0 + (await page.evaluate(() => document.querySelector('.pages')!.clientWidth)) + 16);
+
+  await fire(page, [{ type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.6, fy: 0.5 }]);
+  expect(await currentPage(page)).toBe(0);
+  await expect.poll(() => pageLeft(page, 0)).toBeCloseTo(left0, 0);
+});
+
+test('最後一頁往後拖：只移動一半；拖不夠遠放開不新增，拖超過 20% 出現提示並新增', async ({ page }) => {
+  await swipe(page, 1);
+  await swipe(page, 1);
+  expect(await currentPage(page)).toBe(2);
+  await waitReady(page, 2);
+  const w = await pageWidth(page);
+  // 等翻頁動畫結束：第 3 頁停在置中的位置
+  const left = await page.evaluate(() => {
+    const c = document.querySelector('.pages')!.getBoundingClientRect();
+    const w = document.querySelector('.page')!.getBoundingClientRect().width;
+    return c.left + (c.width - w) / 2;
+  });
+  await expect.poll(() => pageLeft(page, 2)).toBeCloseTo(left, 0);
+
+  // 拖頁寬 10%：頁面只移動 5%，沒有提示；放開不新增
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.6, fy: 0.5 },
+    { type: 'pointermove', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 },
+  ]);
+  await nextFrame(page);
+  expect(await pageLeft(page, 2)).toBeCloseTo(left - 0.05 * w, 0);
+  await expect(page.locator('.pages')).not.toHaveAttribute('data-add-armed');
+  await fire(page, [{ type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 }]);
+  await expect.poll(() => pageLeft(page, 2)).toBeCloseTo(left, 0);
+  expect(await pageCount(page)).toBe(3);
+
+  // 快速輕撥（30px）不新增
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.6, fy: 0.5 },
+    { type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.6 - 30 / w, fy: 0.5 },
+  ]);
+  expect(await pageCount(page)).toBe(3);
+
+  // 拖頁寬 30%：出現提示，放開新增並翻過去
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.8, fy: 0.5 },
+    { type: 'pointermove', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 },
+  ]);
+  await expect(page.locator('.pages')).toHaveAttribute('data-add-armed', '');
+  await expect(page.locator('.add-hint')).toHaveCSS('opacity', '1');
+  await fire(page, [{ type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 }]);
+  await expect.poll(() => pageCount(page)).toBe(4);
+  await expect.poll(() => currentPage(page)).toBe(3);
+  await expect(page.locator('.pages')).not.toHaveAttribute('data-add-armed');
+});
+
+test('第一頁往前拖：只移動一半並彈回', async ({ page }) => {
+  const w = await pageWidth(page);
+  const left0 = await pageLeft(page, 0);
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.3, fy: 0.5 },
+    { type: 'pointermove', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 },
+  ]);
+  await nextFrame(page);
+  expect(await pageLeft(page, 0)).toBeCloseTo(left0 + 0.1 * w, 0);
+  await fire(page, [{ type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 }]);
+  expect(await currentPage(page)).toBe(0);
+  await expect.poll(() => pageLeft(page, 0)).toBeCloseTo(left0, 0);
+});

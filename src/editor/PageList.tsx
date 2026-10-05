@@ -11,7 +11,11 @@ const MAX_PAGE_WIDTH = 900;
 /** 目前頁前後各保留幾頁在 DOM 中 */
 const BUFFER = 1;
 /** 翻頁動畫長度（與 app.css .pages-track.flipping 一致） */
-const FLIP_MS = 200;
+const FLIP_MS = 280;
+/** 最後一頁往後拖超過頁寬的這個比例，放開才新增頁面 */
+const ADD_PAGE_RATIO = 0.2;
+/** 拖動超過這個距離才決定是左右拖（之前不動，避免點一下就晃） */
+const DRAG_LOCK = 8;
 
 export interface PageListHandle {
   /** 翻到 pageId；找不到時翻到 fallbackIndex */
@@ -70,6 +74,17 @@ export function swipeStep(dx: number, dy: number, ms: number): -1 | 0 | 1 {
   const flick = ax >= 15 && ax / Math.max(ms, 1) >= 0.3;
   if (!flick && ax < 40) return 0;
   return dx < 0 ? 1 : -1;
+}
+
+/** 拖動時頁面的位移：一般頁 1:1 跟手；第一頁往前、最後一頁往後是一半（橡皮筋） */
+export function dragOffset(dx: number, atFirst: boolean, atLast: boolean): number {
+  if ((dx > 0 && atFirst) || (dx < 0 && atLast)) return dx / 2;
+  return dx;
+}
+
+/** 在最後一頁往後拖：手指拖超過頁寬 20% 才新增頁面（快速輕撥不算） */
+export function addPageArmed(dx: number, dy: number, pageW: number): boolean {
+  return -dx >= pageW * ADD_PAGE_RATIO && Math.abs(dx) > Math.abs(dy);
 }
 
 /** 雙指放大中（放大時單指拖動是原生平移，不翻頁） */
@@ -164,18 +179,9 @@ export function PageList(props: Props) {
     return () => clearTimeout(t);
   }, [flipping, cur]);
 
-  /** 第一頁再往前翻：彈一下 */
-  const bounce = (dir: number) => {
-    const base = `translateX(${-cur * strideX}px)`;
-    trackRef.current?.animate?.(
-      [{ transform: base }, { transform: `translateX(${-cur * strideX - dir * 40}px)` }, { transform: base }],
-      { duration: 250, easing: 'ease-out' },
-    );
-  };
-
-  // 單指左右滑動翻頁；Pencil 書寫中（手掌）、雙指、放大時不算
-  const latest = useRef({ cur, n, flip, bounce, onFlipPastEnd });
-  latest.current = { cur, n, flip, bounce, onFlipPastEnd };
+  // 單指左右拖動：頁面跟著手指走，放開後翻頁或彈回；Pencil 書寫中（手掌）、雙指、放大時不算
+  const latest = useRef({ cur, n, flip, onFlipPastEnd, strideX, pageW });
+  latest.current = { cur, n, flip, onFlipPastEnd, strideX, pageW };
   useEffect(() => {
     const el = ref.current!;
     // 起點與最後位置（iPad 中途接管手勢時會送 pointercancel，用最後位置判斷）
@@ -183,18 +189,61 @@ export function PageList(props: Props) {
     let multi = false;
     let pen = false;
     let penDown = false;
+    // 已確定是左右拖動（之後每次移動都直接改軌道位置，不經過 Preact 重新渲染）
+    let dragging = false;
+    let raf = 0;
+    const base = () => -latest.current.cur * latest.current.strideX;
+    const track = () => trackRef.current;
+    const setArmed = (on: boolean) => {
+      if (on) el.dataset.addArmed = '';
+      else el.removeAttribute('data-add-armed');
+    };
+    /** 拖動中：直接設定位移（不加動畫） */
+    const follow = (dx: number, dy: number) => {
+      const { cur, n, pageW } = latest.current;
+      const offset = dragOffset(dx, cur === 0, cur === n - 1);
+      setArmed(cur === n - 1 && addPageArmed(dx, dy, pageW));
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const t = track();
+        if (!t) return;
+        t.classList.remove('flipping');
+        t.style.transform = `translateX(${base() + offset}px)`;
+      });
+    };
+    /** 結束拖動：沒有翻頁時用動畫彈回原位 */
+    const settle = () => {
+      cancelAnimationFrame(raf);
+      setArmed(false);
+      const t = track();
+      if (!t) return;
+      t.classList.add('flipping');
+      t.style.transform = `translateX(${base()}px)`;
+      setTimeout(() => t.classList.remove('flipping'), FLIP_MS + 50);
+    };
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'pen') {
         penDown = pen = true;
+        if (dragging) {
+          dragging = false;
+          settle();
+        }
         return;
       }
       if (e.pointerType !== 'touch') return;
       if (touches.size === 0) {
         multi = false;
+        dragging = false;
         pen = penDown;
       }
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp, lx: e.clientX, ly: e.clientY, lt: e.timeStamp });
-      if (touches.size > 1) multi = true;
+      if (touches.size > 1) {
+        multi = true;
+        if (dragging) {
+          dragging = false;
+          settle();
+        }
+      }
     };
     const move = (e: PointerEvent) => {
       const t = touches.get(e.pointerId);
@@ -202,6 +251,11 @@ export function PageList(props: Props) {
       t.lx = e.clientX;
       t.ly = e.clientY;
       t.lt = e.timeStamp;
+      if (multi || pen || zoomed()) return;
+      const dx = e.clientX - t.x;
+      const dy = e.clientY - t.y;
+      if (!dragging && Math.abs(dx) > DRAG_LOCK && Math.abs(dx) > Math.abs(dy)) dragging = true;
+      if (dragging) follow(dx, dy);
     };
     const up = (e: PointerEvent) => {
       if (e.pointerType === 'pen') {
@@ -211,21 +265,38 @@ export function PageList(props: Props) {
       const start = touches.get(e.pointerId);
       if (!start) return;
       touches.delete(e.pointerId);
-      if (multi || pen || zoomed()) return;
+      const wasDragging = dragging;
+      dragging = false;
+      if (multi || pen || zoomed()) {
+        if (wasDragging) settle();
+        return;
+      }
       const [x, y, t] = e.type === 'pointercancel' ? [start.lx, start.ly, start.lt] : [e.clientX, e.clientY, e.timeStamp];
-      const step = swipeStep(x - start.x, y - start.y, t - start.t);
-      if (!step) return;
-      const { cur, n, flip, bounce, onFlipPastEnd } = latest.current;
+      const dx = x - start.x;
+      const dy = y - start.y;
+      const { cur, n, flip, onFlipPastEnd, pageW } = latest.current;
+      const step = swipeStep(dx, dy, t - start.t);
+      if (step === 1 && cur === n - 1) {
+        // 最後一頁：要拖夠遠才新增；新頁出現後從目前位置滑過去
+        if (addPageArmed(dx, dy, pageW)) {
+          cancelAnimationFrame(raf);
+          setArmed(false);
+          onFlipPastEnd();
+        } else settle();
+        return;
+      }
       const next = cur + step;
-      if (next < 0) bounce(step);
-      else if (next >= n) onFlipPastEnd();
-      else flip(next);
+      if (step && next >= 0) {
+        cancelAnimationFrame(raf);
+        flip(next);
+      } else if (wasDragging) settle();
     };
     el.addEventListener('pointerdown', down, true);
     el.addEventListener('pointermove', move, true);
     el.addEventListener('pointerup', up, true);
     el.addEventListener('pointercancel', up, true);
     return () => {
+      cancelAnimationFrame(raf);
       el.removeEventListener('pointerdown', down, true);
       el.removeEventListener('pointermove', move, true);
       el.removeEventListener('pointerup', up, true);
@@ -283,6 +354,10 @@ export function PageList(props: Props) {
               </div>
             );
           })}
+      </div>
+      <div class="add-hint" aria-hidden="true">
+        ＋<br />
+        新增頁面
       </div>
     </div>
   );

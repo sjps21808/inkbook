@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { swipeStep } from '../src/editor/PageList';
+import { addPageArmed, dragOffset, swipeStep } from '../src/editor/PageList';
 
 describe('手指滑動翻頁判斷', () => {
   it('往左滑 = 下一頁，往右滑 = 上一頁', () => {
@@ -22,5 +22,32 @@ describe('手指滑動翻頁判斷', () => {
   it('偏垂直方向不算（水平量要大於垂直量）', () => {
     expect(swipeStep(-100, 100, 200)).toBe(0);
     expect(swipeStep(-100, 90, 200)).toBe(1);
+  });
+});
+
+describe('拖動跟手', () => {
+  it('一般頁 1:1 跟著手指', () => {
+    expect(dragOffset(-100, false, false)).toBe(-100);
+    expect(dragOffset(100, false, false)).toBe(100);
+  });
+
+  it('第一頁往前、最後一頁往後只移動一半（橡皮筋）', () => {
+    expect(dragOffset(100, true, false)).toBe(50);
+    expect(dragOffset(-100, false, true)).toBe(-50);
+    // 反方向仍然 1:1
+    expect(dragOffset(-100, true, false)).toBe(-100);
+    expect(dragOffset(100, false, true)).toBe(100);
+  });
+});
+
+describe('最後一頁拖動新增頁面', () => {
+  it('手指往左拖超過頁寬 20% 才算', () => {
+    expect(addPageArmed(-160, 0, 800)).toBe(true);
+    expect(addPageArmed(-159, 0, 800)).toBe(false);
+  });
+
+  it('往右或偏垂直不算', () => {
+    expect(addPageArmed(200, 0, 800)).toBe(false);
+    expect(addPageArmed(-200, 250, 800)).toBe(false);
   });
 });
