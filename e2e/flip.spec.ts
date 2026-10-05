@@ -213,7 +213,7 @@ test('拖動時頁面跟著手指走，沒翻頁時放開彈回原位', async ({
   await expect.poll(() => pageLeft(page, 0)).toBeCloseTo(left0, 0);
 });
 
-test('最後一頁往後拖：只移動一半；拖不夠遠放開不新增，拖超過 20% 出現提示並新增', async ({ page }) => {
+test('最後一頁往後拖：只移動一半；拖不夠遠放開不新增，拖超過 35% 出現提示並新增', async ({ page }) => {
   await swipe(page, 1);
   await swipe(page, 1);
   expect(await currentPage(page)).toBe(2);
@@ -246,14 +246,18 @@ test('最後一頁往後拖：只移動一半；拖不夠遠放開不新增，�
   ]);
   expect(await pageCount(page)).toBe(3);
 
-  // 拖頁寬 30%：出現提示，放開新增並翻過去
+  // 拖頁寬 30%：還不到 35%，沒有提示
   await fire(page, [
     { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.8, fy: 0.5 },
     { type: 'pointermove', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 },
   ]);
+  await nextFrame(page);
+  await expect(page.locator('.pages')).not.toHaveAttribute('data-add-armed');
+  // 繼續拖到 40%：出現提示，放開新增並翻過去
+  await fire(page, [{ type: 'pointermove', pointerType: 'touch', id: 11, fx: 0.4, fy: 0.5 }]);
   await expect(page.locator('.pages')).toHaveAttribute('data-add-armed', '');
   await expect(page.locator('.add-hint')).toHaveCSS('opacity', '1');
-  await fire(page, [{ type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 }]);
+  await fire(page, [{ type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.4, fy: 0.5 }]);
   await expect.poll(() => pageCount(page)).toBe(4);
   await expect.poll(() => currentPage(page)).toBe(3);
   await expect(page.locator('.pages')).not.toHaveAttribute('data-add-armed');
