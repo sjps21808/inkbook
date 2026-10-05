@@ -16,7 +16,7 @@ test('匯入混合尺寸的 PDF：建立筆記本並開啟，每個 PDF 頁一�
   await importPdfFile(page, await makePdf([[595, 842], [612, 792], [842, 595]]), '微積分講義.pdf');
   await expect(page.locator('.nb-title')).toHaveText('微積分講義');
   await waitReady(page);
-  await expect(page.locator('.pages')).toHaveAttribute('data-stride', /\d/);
+  await expect(page.locator('.pages')).toHaveAttribute('data-current', '0');
   expect(await pageCount(page)).toBe(3);
   const pdfs = await page.evaluate(
     () =>

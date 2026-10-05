@@ -1,63 +1,63 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   drawStroke,
   elementCount,
   hLine,
   inkPixel,
+  goToPage,
   mountedPages,
   openNewNotebook,
-  scrollToPage,
   seedPages,
   waitReady,
 } from './helpers/pen';
 
-/** 可見頁數 + 前後各 2 頁 */
-const maxMounted = (page: Page) =>
-  page.evaluate(() => {
-    const stride = Number(document.querySelector<HTMLElement>('.pages')!.dataset.stride);
-    return Math.ceil(window.innerHeight / stride) + 1 + 4;
-  });
+/** 目前頁 + 前後各 1 頁 */
+const MAX_MOUNTED = 3;
 
 test.beforeEach(async ({ page }) => {
   await openNewNotebook(page);
   await seedPages(page, 20);
 });
 
-test('虛擬捲動：DOM 只保留可見頁前後各 2 頁', async ({ page }) => {
-  const limit = await maxMounted(page);
+test('DOM 只保留目前頁前後各 1 頁', async ({ page }) => {
   let mounted = await mountedPages(page);
   expect(mounted[0]).toBe(0);
-  expect(mounted.length).toBeLessThanOrEqual(limit);
+  expect(mounted.length).toBeLessThanOrEqual(MAX_MOUNTED);
   expect(mounted.length).toBeLessThan(20);
 
-  await scrollToPage(page, 19);
+  await goToPage(page, 19);
   mounted = await mountedPages(page);
   expect(mounted).toContain(19);
   expect(mounted).not.toContain(0);
-  expect(mounted.length).toBeLessThanOrEqual(limit);
+  expect(mounted.length).toBeLessThanOrEqual(MAX_MOUNTED);
   // 已存在的筆畫（seed）有畫出來
   await expect.poll(async () => (await inkPixel(page, [0.5, 0.5], 19))[3]).toBe(255);
 });
 
-test('在第 3 頁書寫，捲走再捲回來筆畫還在；undo 時捲回第 3 頁', async ({ page }) => {
-  await scrollToPage(page, 2);
+test('在第 3 頁書寫，翻走再翻回來筆畫還在；undo 時翻回第 3 頁', async ({ page }) => {
+  await goToPage(page, 2);
   await drawStroke(page, hLine(0.3), 'pen', 2);
   await expect.poll(() => elementCount(page)).toBe(20);
 
-  await scrollToPage(page, 19);
+  await goToPage(page, 19);
   expect(await mountedPages(page)).not.toContain(2);
-  await scrollToPage(page, 0);
-  await scrollToPage(page, 2);
+  await goToPage(page, 0);
+  await goToPage(page, 2);
   await expect.poll(async () => (await inkPixel(page, [0.5, 0.3], 2))[3]).toBe(255);
 
-  await scrollToPage(page, 19);
+  await goToPage(page, 19);
   await page.getByRole('button', { name: '復原' }).click();
   await waitReady(page, 2);
-  const inView = await page.evaluate(() => {
-    const r = document.querySelector('.page[data-index="2"]')!.getBoundingClientRect();
-    return r.top < window.innerHeight && r.bottom > 0;
-  });
-  expect(inView).toBe(true);
+  await expect(page.locator('.pages')).toHaveAttribute('data-current', '2');
+  // 翻頁動畫結束後第 3 頁完整在畫面內
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const r = document.querySelector('.page[data-index="2"]')!.getBoundingClientRect();
+        return r.left >= 0 && r.right <= document.documentElement.clientWidth;
+      }),
+    )
+    .toBe(true);
   await expect.poll(async () => (await inkPixel(page, [0.5, 0.3], 2))[3]).toBe(0);
   await expect.poll(() => elementCount(page)).toBe(19);
 });

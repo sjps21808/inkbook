@@ -1,4 +1,4 @@
-import { bgPixel, pageCount, scrollToPage, waitReady } from './helpers/pen';
+import { bgPixel, goToPage, pageCount, waitReady } from './helpers/pen';
 import { makePdf } from './helpers/pdf';
 import { expect, test } from './helpers/persistent';
 
@@ -25,7 +25,7 @@ test('500 頁 PDF 在 10 秒內匯入完成，最後一頁可以顯示', async (
   expect(elapsed).toBeLessThan(10_000);
   expect(await pageCount(page)).toBe(500);
 
-  await scrollToPage(page, 499);
+  await goToPage(page, 499);
   await expect.poll(async () => (await bgPixel(page, [297, 421], 499))[0]).toBeLessThan(60);
   expect(errors).toEqual([]);
 });

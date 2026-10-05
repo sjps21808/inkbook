@@ -109,17 +109,27 @@ html, body {
 }
 
 .editor {
-  padding: 16px 16px 120px;
+  padding: 16px;
+  overflow-x: clip; /* 左右相鄰的頁在畫面外 */
 }
 
 .pages {
   position: relative;
 }
 
+/* 所有頁橫向排列，平移整條軌道來翻頁 */
+.pages-track {
+  position: absolute;
+  inset: 0;
+}
+
+.pages-track.flipping {
+  transition: transform 200ms ease-out;
+}
+
 .page-slot {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
 }
 
 .page {
@@ -128,7 +138,12 @@ html, body {
   height: 100%;
   background: #fff; /* 白紙：深色模式也不變 */
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
-  /* 手指：原生捲動與縮放（不含雙擊放大）；筆由 JS 處理 */
+  /* 手指：單指滑動由 JS 判斷翻頁，雙指原生縮放（不含雙擊放大）；筆由 JS 處理 */
+  touch-action: pinch-zoom;
+}
+
+/* 放大時單指要能原生平移 */
+html[data-zoomed] .page {
   touch-action: pan-x pan-y pinch-zoom;
 }
 

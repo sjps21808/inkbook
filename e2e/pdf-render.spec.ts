@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { bgPixel, drawStroke, elementCount, hLine, inkPixel, waitReady } from './helpers/pen';
+import { bgPixel, drawStroke, elementCount, goToPage, hLine, inkPixel, waitReady } from './helpers/pen';
 import { importPdfFile, makePdf } from './helpers/pdf';
 import { expect, test } from './helpers/persistent';
 
@@ -17,7 +17,7 @@ test('PDF 頁顯示在 bg 圖層：A4 填滿、橫向靠上、瘦長頁置中', 
 
   // 每頁中央 20% × 20% 塗黑
   await importPdfFile(page, await makePdf([[595, 842], [842, 595], [200, 1000]]));
-  for (const i of [0, 1, 2]) await waitReady(page, i);
+  for (const i of [0, 1]) await waitReady(page, i);
 
   // 第 1 頁 A4：中央黑、四周白
   await expect.poll(() => isDark(page, [297, 421], 0)).toBe(true);
@@ -29,7 +29,8 @@ test('PDF 頁顯示在 bg 圖層：A4 填滿、橫向靠上、瘦長頁置中', 
   expect(await isWhite(page, [297, 421], 1)).toBe(true);
   expect(await isWhite(page, [297, 700], 1)).toBe(true);
 
-  // 第 3 頁瘦長：整頁放得下、水平置中 → 寬 168.4pt，x 在 213~381
+  // 第 3 頁瘦長：整頁放得下、水平置中 → 寬 168.4pt，x 在 213~381（一次只掛載目前頁前後各 1 頁，先翻過去）
+  await goToPage(page, 2);
   await expect.poll(() => isDark(page, [297, 421], 2)).toBe(true);
   expect(await isWhite(page, [150, 421], 2)).toBe(true);
   expect(await isWhite(page, [450, 421], 2)).toBe(true);

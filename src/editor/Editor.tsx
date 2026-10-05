@@ -248,7 +248,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     };
   };
 
-  /** 執行（或 undo/redo）後捲到受影響的頁面 */
+  /** 執行（或 undo/redo）後翻到受影響的頁面 */
   const run = (task: () => Promise<Command | undefined>) => {
     // 先存下編輯中的文字（排在這個動作之前）
     blurEditing();
@@ -257,7 +257,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
       .then(async (cmd) => {
         if (!cmd) return;
         await nextFrame();
-        listRef.current?.scrollToPage(cmd.pageId, cmd.pageIndex);
+        listRef.current?.goToPage(cmd.pageId, cmd.pageIndex);
       })
       .finally(refresh);
   };
@@ -341,7 +341,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
           elementsOf={(id) => cache[id]}
           versions={versions}
           pdfDocs={pdfDocs}
-          onJump={(i) => listRef.current?.scrollToPage(pages[i].id)}
+          onJump={(i) => listRef.current?.goToPage(pages[i].id)}
           onReorder={(from, to) => execute(reorderCommand(from, to))}
           collapsed={collapsed}
         />

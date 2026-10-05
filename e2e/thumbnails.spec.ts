@@ -49,12 +49,13 @@ test('點縮圖跳到該頁', async ({ page }) => {
   await toggle(page);
   await page.getByRole('button', { name: '第 4 頁' }).click();
   await waitReady(page, 3);
-  const top = await page.evaluate(() => {
+  await expect(page.locator('.pages')).toHaveAttribute('data-current', '3');
+  // 跳頁（不相鄰）沒有動畫：第 4 頁立刻完整在畫面內
+  const inView = await page.evaluate(() => {
     const r = document.querySelector('.page[data-index="3"]')!.getBoundingClientRect();
-    return { top: r.top, toolbar: document.querySelector('.toolbar')!.getBoundingClientRect().bottom };
+    return r.left >= 0 && r.right <= document.documentElement.clientWidth;
   });
-  expect(top.top).toBeGreaterThanOrEqual(top.toolbar);
-  expect(top.top).toBeLessThan(top.toolbar + 40);
+  expect(inView).toBe(true);
 });
 
 test('拖曳縮圖重新排序，undo 恢復', async ({ page }) => {

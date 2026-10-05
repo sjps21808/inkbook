@@ -119,15 +119,46 @@ export async function seedPages(page: Page, total: number) {
   await waitReady(page);
 }
 
-/** 捲到第 index 頁（頁頂對齊工具列下緣），並等它載入完成 */
-export async function scrollToPage(page: Page, index: number) {
-  await page.evaluate((index) => {
-    const c = document.querySelector<HTMLElement>('.pages')!;
-    const stride = Number(c.dataset.stride);
-    const toolbar = document.querySelector('.toolbar')!.getBoundingClientRect().bottom;
-    window.scrollTo(0, window.scrollY + c.getBoundingClientRect().top + index * stride - toolbar);
-  }, index);
+/** 用縮圖側欄翻到第 index 頁，並等它載入完成（側欄維持原本的開關狀態） */
+export async function goToPage(page: Page, index: number) {
+  const sidebar = page.getByRole('button', { name: '頁面', exact: true });
+  const wasOpen = await page.locator('.thumbnails').isVisible();
+  if (!wasOpen) await sidebar.click();
+  await page.getByRole('button', { name: `第 ${index + 1} 頁`, exact: true }).click();
+  if (!wasOpen) await sidebar.click();
+  await page.locator(`.pages[data-current="${index}"]`).waitFor();
   await waitReady(page, index);
+}
+
+/** 用合成 PointerEvent 模擬手指在目前頁上左右滑動：dir = 1 往左滑（下一頁）、-1 往右滑（上一頁） */
+export async function swipe(page: Page, dir: 1 | -1) {
+  await page.evaluate((dir) => {
+    const cur = document.querySelector<HTMLElement>('.pages')!.dataset.current;
+    const target = document.querySelector(`.page[data-index="${cur}"] .overlay`)!;
+    const r = target.getBoundingClientRect();
+    const y = r.top + r.height / 2;
+    const [x0, x1] = dir === 1 ? [0.8, 0.2] : [0.2, 0.8];
+    const fire = (type: string, fx: number) =>
+      target.dispatchEvent(
+        new PointerEvent(type, {
+          pointerType: 'touch',
+          pointerId: 11,
+          isPrimary: true,
+          clientX: r.left + fx * r.width,
+          clientY: y,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    fire('pointerdown', x0);
+    fire('pointermove', (x0 + x1) / 2);
+    fire('pointerup', x1);
+  }, dir);
+}
+
+/** 目前顯示的頁面 index */
+export async function currentPage(page: Page) {
+  return Number(await page.locator('.pages').getAttribute('data-current'));
 }
 
 /** 目前 DOM 中的頁面 index */

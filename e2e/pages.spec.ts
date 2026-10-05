@@ -7,8 +7,8 @@ import {
   inkPixel,
   mountedPages,
   openNewNotebook,
+  goToPage,
   pageCount,
-  scrollToPage,
   waitReady,
 } from './helpers/pen';
 
@@ -58,14 +58,14 @@ test('只剩一頁時不能刪除', async ({ page }) => {
   await expect(btn(page, '刪除頁面')).toBeDisabled();
 });
 
-test('刪除頁面要確認；undo 會還原頁面與筆畫並捲回該頁；重新整理後一致', async ({ page }) => {
+test('刪除頁面要確認；undo 會還原頁面與筆畫並翻回該頁；重新整理後一致', async ({ page }) => {
   await addPage(page, '空白');
   await addPage(page, '空白');
   await expect.poll(() => pageCount(page)).toBe(3);
-  // 等 App 新增頁面後自己捲到新頁完成，再捲到第 2 頁（否則 App 的捲動會蓋掉）
+  // 等 App 新增頁面後自己翻到新頁完成，再翻到第 2 頁（否則 App 的翻頁會蓋掉）
   await waitReady(page, 2);
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-  await scrollToPage(page, 1);
+  await goToPage(page, 1);
   await drawStroke(page, hLine(0.3), 'pen', 1);
   await expect.poll(() => elementCount(page)).toBe(1);
 
@@ -80,7 +80,7 @@ test('刪除頁面要確認；undo 會還原頁面與筆畫並捲回該頁；重
   await expect.poll(() => pageCount(page)).toBe(2);
   await expect.poll(() => elementCount(page)).toBe(0);
 
-  await scrollToPage(page, 0);
+  await goToPage(page, 0);
   await btn(page, '復原').click();
   await expect.poll(() => pageCount(page)).toBe(3);
   await expect.poll(() => elementCount(page)).toBe(1);
@@ -89,6 +89,6 @@ test('刪除頁面要確認；undo 會還原頁面與筆畫並捲回該頁；重
 
   await page.reload();
   await waitReady(page);
-  await scrollToPage(page, 1);
+  await goToPage(page, 1);
   await expect.poll(async () => (await inkPixel(page, [0.5, 0.3], 1))[3]).toBe(255);
 });

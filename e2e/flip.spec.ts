@@ -1,0 +1,94 @@
+import { expect, test, type Page } from '@playwright/test';
+import { currentPage, openNewNotebook, seedPages, swipe, waitReady } from './helpers/pen';
+
+/** 在目前頁上發出一串 pointer 事件 */
+const fire = (page: Page, events: { type: string; pointerType: string; id: number; fx: number; fy: number }[]) =>
+  page.evaluate((events) => {
+    const cur = document.querySelector<HTMLElement>('.pages')!.dataset.current;
+    const target = document.querySelector(`.page[data-index="${cur}"] .overlay`)!;
+    const r = target.getBoundingClientRect();
+    for (const e of events)
+      target.dispatchEvent(
+        new PointerEvent(e.type, {
+          pointerType: e.pointerType,
+          pointerId: e.id,
+          clientX: r.left + e.fx * r.width,
+          clientY: r.top + e.fy * r.height,
+          pressure: 0.5,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+  }, events);
+
+test.beforeEach(async ({ page }) => {
+  await openNewNotebook(page);
+  await seedPages(page, 3);
+});
+
+test('一次顯示一頁，頁面不能上下捲動', async ({ page }) => {
+  expect(await currentPage(page)).toBe(0);
+  const fits = await page.evaluate(
+    () => document.documentElement.scrollHeight <= document.documentElement.clientHeight,
+  );
+  expect(fits).toBe(true);
+  // 相鄰頁在畫面外
+  const nextVisible = await page.evaluate(() => {
+    const r = document.querySelector('.page[data-index="1"]')!.getBoundingClientRect();
+    return r.left < document.documentElement.clientWidth;
+  });
+  expect(nextVisible).toBe(false);
+});
+
+test('手指往左滑下一頁、往右滑上一頁，動畫結束後新頁完整在畫面內', async ({ page }) => {
+  await swipe(page, 1);
+  expect(await currentPage(page)).toBe(1);
+  await waitReady(page, 1);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const r = document.querySelector('.page[data-index="1"]')!.getBoundingClientRect();
+        return r.left >= 0 && r.right <= document.documentElement.clientWidth;
+      }),
+    )
+    .toBe(true);
+  await swipe(page, -1);
+  expect(await currentPage(page)).toBe(0);
+});
+
+test('第一頁往前、最後一頁往後翻：停在原頁，頁數不變', async ({ page }) => {
+  await swipe(page, -1);
+  expect(await currentPage(page)).toBe(0);
+  await swipe(page, 1);
+  await swipe(page, 1);
+  expect(await currentPage(page)).toBe(2);
+  await swipe(page, 1);
+  expect(await currentPage(page)).toBe(2);
+  await expect(page.locator('.page')).toHaveCount(2); // 第 2、3 頁
+});
+
+test('Pencil 書寫中手掌滑過不翻頁', async ({ page }) => {
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'pen', id: 7, fx: 0.5, fy: 0.3 },
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.8, fy: 0.7 },
+    { type: 'pointermove', pointerType: 'pen', id: 7, fx: 0.6, fy: 0.3 },
+    { type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.2, fy: 0.7 },
+    { type: 'pointerup', pointerType: 'pen', id: 7, fx: 0.6, fy: 0.3 },
+  ]);
+  expect(await currentPage(page)).toBe(0);
+});
+
+test('雙指與上下滑動不翻頁', async ({ page }) => {
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.8, fy: 0.4 },
+    { type: 'pointerdown', pointerType: 'touch', id: 12, fx: 0.8, fy: 0.6 },
+    { type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.2, fy: 0.4 },
+    { type: 'pointerup', pointerType: 'touch', id: 12, fx: 0.2, fy: 0.6 },
+  ]);
+  expect(await currentPage(page)).toBe(0);
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.8 },
+    { type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.45, fy: 0.2 },
+  ]);
+  expect(await currentPage(page)).toBe(0);
+});
