@@ -305,6 +305,8 @@ test('翻頁動畫還沒播完就再拖：頁面從看得到的位置接著動�
     const w = document.querySelector('.page')!.getBoundingClientRect().width;
     fire('pointerdown', 0.6);
     fire('pointermove', 0.6 - 12 / w);
+    // 開始拖動的當下頁面停在看得到的位置（位移下一個 frame 才套用）
+    const frozen = left(1);
     await frame();
     await frame();
     const during = left(1);
@@ -312,12 +314,15 @@ test('翻頁動畫還沒播完就再拖：頁面從看得到的位置接著動�
       const c = pages.getBoundingClientRect();
       return c.left + (c.width - w) / 2;
     })();
-    return { before, during, centered };
+    return { before, frozen, during, centered };
   });
   // 動畫中途：第 2 頁還沒到中間
   expect(r.before).toBeGreaterThan(r.centered + 20);
-  // 開始拖動時沒有跳到中間，而是從原本的位置再往左 12px
-  expect(r.during).toBeCloseTo(r.before - 12, 0);
+  // 開始拖動時停在動畫路徑上（讀 before 之後動畫可能又往中間走了一點），沒有跳過中間
+  expect(r.frozen).toBeLessThanOrEqual(r.before);
+  expect(r.frozen).toBeGreaterThanOrEqual(r.centered - 0.5);
+  // 之後從停住的位置跟著手指往左 12px（舊版會直接跳到「中間 − 12px」）
+  expect(r.during).toBeCloseTo(r.frozen - 12, 0);
 
   // 放開（快速輕撥）→ 翻到第 3 頁，最後停在中間
   await fire(page, [{ type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.2, fy: 0.5 }]);
