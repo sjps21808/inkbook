@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { currentPage, openNewNotebook, seedPages, swipe, waitReady } from './helpers/pen';
+import { currentPage, openNewNotebook, pageCount, seedPages, swipe, waitReady } from './helpers/pen';
 
 /** 在目前頁上發出一串 pointer 事件 */
 const fire = (page: Page, events: { type: string; pointerType: string; id: number; fx: number; fy: number }[]) =>
@@ -56,15 +56,49 @@ test('手指往左滑下一頁、往右滑上一頁，動畫結束後新頁完�
   expect(await currentPage(page)).toBe(0);
 });
 
-test('第一頁往前、最後一頁往後翻：停在原頁，頁數不變', async ({ page }) => {
+/** DB 中依 order 排列的頁面模板 */
+const templates = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<string[]>((resolve) => {
+        const req = indexedDB.open('inkbook');
+        req.onsuccess = () => {
+          const q = req.result.transaction('pages').objectStore('pages').getAll();
+          q.onsuccess = () => {
+            resolve(
+              (q.result as { order: number; template: string }[]).sort((a, b) => a.order - b.order).map((p) => p.template),
+            );
+            req.result.close();
+          };
+        };
+      }),
+  );
+
+test('第一頁往前翻：停在原頁，頁數不變', async ({ page }) => {
   await swipe(page, -1);
   expect(await currentPage(page)).toBe(0);
+  expect(await pageCount(page)).toBe(3);
+});
+
+test('最後一頁往後翻：新增一頁（模板同最後一頁）並翻過去，復原後移除並翻回', async ({ page }) => {
+  // 在最後加一頁方格（新增頁面插在目前頁後面，先翻到最後），確認新頁沿用的是最後一頁的模板
   await swipe(page, 1);
   await swipe(page, 1);
   expect(await currentPage(page)).toBe(2);
+  await page.getByRole('button', { name: '新增頁面', exact: true }).click();
+  await page.getByRole('menuitem', { name: '方格' }).click();
+  await expect.poll(() => pageCount(page)).toBe(4);
+  await expect.poll(() => currentPage(page)).toBe(3);
+
   await swipe(page, 1);
-  expect(await currentPage(page)).toBe(2);
-  await expect(page.locator('.page')).toHaveCount(2); // 第 2、3 頁
+  await expect.poll(() => pageCount(page)).toBe(5);
+  await expect.poll(() => currentPage(page)).toBe(4);
+  expect((await templates(page))[4]).toBe('grid');
+  await expect(page.locator('.page-no')).toHaveText('5 / 5');
+
+  await page.getByRole('button', { name: '復原', exact: true }).click();
+  await expect.poll(() => pageCount(page)).toBe(4);
+  await expect.poll(() => currentPage(page)).toBe(3);
 });
 
 test('Pencil 書寫中手掌滑過不翻頁', async ({ page }) => {
@@ -104,12 +138,15 @@ test('工具列翻頁按鈕與頁碼', async ({ page }) => {
   expect(await currentPage(page)).toBe(1);
   await next.click();
   await expect(no).toHaveText('3 / 3');
-  await expect(next).toBeDisabled();
+  // 最後一頁按「›」= 新增一頁並翻過去
+  await next.click();
+  await expect(no).toHaveText('4 / 4');
+  expect(await pageCount(page)).toBe(4);
   await prev.click();
-  await expect(no).toHaveText('2 / 3');
+  await expect(no).toHaveText('3 / 4');
   // 滑動翻頁也會更新頁碼
   await swipe(page, -1);
-  await expect(no).toHaveText('1 / 3');
+  await expect(no).toHaveText('2 / 4');
 });
 
 test('選單收起時翻頁按鈕隱藏，仍可滑動翻頁', async ({ page }) => {

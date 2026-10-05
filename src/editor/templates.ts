@@ -1,4 +1,4 @@
-import { PAGE_HEIGHT, PAGE_WIDTH, type Template } from '../db/schema';
+import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type Template } from '../db/schema';
 
 export const TEMPLATES: { id: Template; label: string }[] = [
   { id: 'blank', label: '空白' },
@@ -6,6 +6,11 @@ export const TEMPLATES: { id: Template; label: string }[] = [
   { id: 'grid', label: '方格' },
   { id: 'dot', label: '點陣' },
 ];
+
+/** 翻過最後一頁自動新增的頁面模板：與最後一頁相同；PDF 頁改用筆記本預設模板 */
+export function nextPageTemplate(last: Page, notebookTemplate: Template): Template {
+  return last.pdf ? notebookTemplate : last.template;
+}
 
 export const TEMPLATE_COLOR = '#c8d3e0';
 export const TEMPLATE_LINE_WIDTH = 0.5;

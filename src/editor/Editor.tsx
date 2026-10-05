@@ -19,6 +19,7 @@ import { transformElement } from './geometry';
 import { ImageCache } from './images';
 import { loadCollapsed, saveCollapsed } from './chrome';
 import { loadLastPage, saveLastPage } from './lastPage';
+import { nextPageTemplate } from './templates';
 import { blurEditing } from './text';
 import { elementsCommand, History, type Command, type ElementStore } from './history';
 import { PageActions } from './PageActions';
@@ -277,6 +278,12 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     if (i >= 0) saveLastPage(notebook.id, pages[i].id, i);
   }, [current, pages]);
 
+  /** 翻過最後一頁：在最後新增一頁（可以 undo），run 會翻過去 */
+  const addPageAtEnd = () => {
+    const last = pages[pages.length - 1];
+    execute(addPageCommand(pages.length, nextPageTemplate(last, notebook.template)));
+  };
+
   const toggleChrome = () => {
     saveCollapsed(!collapsed);
     setCollapsed(!collapsed);
@@ -326,8 +333,9 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
           </span>
           <button
             aria-label="下一頁"
-            disabled={current >= pages.length - 1}
-            onClick={() => listRef.current?.goToPage(pages[current + 1].id)}
+            onClick={() =>
+              current >= pages.length - 1 ? addPageAtEnd() : listRef.current?.goToPage(pages[current + 1].id)
+            }
           >
             ›
           </button>
@@ -389,6 +397,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         onSelect={(pageId, ids) => setSelection(ids.length ? { pageId, ids } : null)}
         pdfDocs={pdfDocs}
         onPageChange={setCurrent}
+        onFlipPastEnd={addPageAtEnd}
         initialIndex={initialIndex}
       />
     </div>

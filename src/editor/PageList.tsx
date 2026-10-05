@@ -34,6 +34,8 @@ interface Props {
   onSelect(pageId: string, ids: string[]): void;
   handle: Ref<PageListHandle>;
   pdfDocs: PdfDocs;
+  /** 在最後一頁再往後翻 */
+  onFlipPastEnd(): void;
   /** 第一次顯示的頁面 index */
   initialIndex: number;
   /** 目前頁改變（含第一次顯示） */
@@ -90,6 +92,7 @@ export function PageList(props: Props) {
     pdfDocs,
     onPageChange,
     initialIndex,
+    onFlipPastEnd,
   } = props;
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -161,7 +164,7 @@ export function PageList(props: Props) {
     return () => clearTimeout(t);
   }, [flipping, cur]);
 
-  /** 第一頁／最後一頁再翻：彈一下 */
+  /** 第一頁再往前翻：彈一下 */
   const bounce = (dir: number) => {
     const base = `translateX(${-cur * strideX}px)`;
     trackRef.current?.animate?.(
@@ -171,8 +174,8 @@ export function PageList(props: Props) {
   };
 
   // 單指左右滑動翻頁；Pencil 書寫中（手掌）、雙指、放大時不算
-  const latest = useRef({ cur, n, flip, bounce });
-  latest.current = { cur, n, flip, bounce };
+  const latest = useRef({ cur, n, flip, bounce, onFlipPastEnd });
+  latest.current = { cur, n, flip, bounce, onFlipPastEnd };
   useEffect(() => {
     const el = ref.current!;
     // 起點與最後位置（iPad 中途接管手勢時會送 pointercancel，用最後位置判斷）
@@ -212,9 +215,10 @@ export function PageList(props: Props) {
       const [x, y, t] = e.type === 'pointercancel' ? [start.lx, start.ly, start.lt] : [e.clientX, e.clientY, e.timeStamp];
       const step = swipeStep(x - start.x, y - start.y, t - start.t);
       if (!step) return;
-      const { cur, n, flip, bounce } = latest.current;
+      const { cur, n, flip, bounce, onFlipPastEnd } = latest.current;
       const next = cur + step;
-      if (next < 0 || next >= n) bounce(step);
+      if (next < 0) bounce(step);
+      else if (next >= n) onFlipPastEnd();
       else flip(next);
     };
     el.addEventListener('pointerdown', down, true);

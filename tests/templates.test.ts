@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { drawTemplate, templateShapes } from '../src/editor/templates';
+import type { Page } from '../src/db/schema';
+import { drawTemplate, nextPageTemplate, templateShapes } from '../src/editor/templates';
 
 const MM5 = (5 * 72) / 25.4;
+
+describe('nextPageTemplate', () => {
+  const page = (p: Partial<Page>): Page => ({ id: 'p', notebookId: 'nb', order: 0, template: 'blank', ...p });
+
+  it('與最後一頁相同', () => {
+    expect(nextPageTemplate(page({ template: 'grid' }), 'lined')).toBe('grid');
+  });
+
+  it('最後一頁是 PDF 頁時用筆記本預設模板', () => {
+    const pdf = { blobId: 'b', pageNo: 1, srcWidth: 595, srcHeight: 842 };
+    expect(nextPageTemplate(page({ template: 'blank', pdf }), 'dot')).toBe('dot');
+  });
+});
 
 describe('templateShapes', () => {
   it('空白沒有任何線條或點', () => {
