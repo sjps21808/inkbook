@@ -276,3 +276,52 @@ test('第一頁往前拖：只移動一半並彈回', async ({ page }) => {
   expect(await currentPage(page)).toBe(0);
   await expect.poll(() => pageLeft(page, 0)).toBeCloseTo(left0, 0);
 });
+
+test('翻頁動畫還沒播完就再拖：頁面從看得到的位置接著動，不會跳；放開後翻到再下一頁', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const frame = () => new Promise((res) => requestAnimationFrame(() => res(null)));
+    const pages = document.querySelector<HTMLElement>('.pages')!;
+    const fire = (type: string, fx: number) => {
+      const target = document.querySelector(`.page[data-index="${pages.dataset.current}"] .overlay`)!;
+      const rect = target.getBoundingClientRect();
+      target.dispatchEvent(
+        new PointerEvent(type, {
+          pointerType: 'touch',
+          pointerId: 11,
+          clientX: rect.left + fx * rect.width,
+          clientY: rect.top + rect.height / 2,
+          bubbles: true,
+        }),
+      );
+    };
+    const left = (i: number) => document.querySelector(`.page[data-index="${i}"]`)!.getBoundingClientRect().left;
+    // 第一次翻頁（0 → 1），動畫播到一半
+    fire('pointerdown', 0.8);
+    fire('pointermove', 0.5);
+    fire('pointerup', 0.2);
+    await frame();
+    const before = left(1);
+    // 馬上再拖 12px（同一個 task 內讀位置與開始拖動）
+    const w = document.querySelector('.page')!.getBoundingClientRect().width;
+    fire('pointerdown', 0.6);
+    fire('pointermove', 0.6 - 12 / w);
+    await frame();
+    await frame();
+    const during = left(1);
+    const centered = (() => {
+      const c = pages.getBoundingClientRect();
+      return c.left + (c.width - w) / 2;
+    })();
+    return { before, during, centered };
+  });
+  // 動畫中途：第 2 頁還沒到中間
+  expect(r.before).toBeGreaterThan(r.centered + 20);
+  // 開始拖動時沒有跳到中間，而是從原本的位置再往左 12px
+  expect(r.during).toBeCloseTo(r.before - 12, 0);
+
+  // 放開（快速輕撥）→ 翻到第 3 頁，最後停在中間
+  await fire(page, [{ type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.2, fy: 0.5 }]);
+  await expect.poll(() => currentPage(page)).toBe(2);
+  await waitReady(page, 2);
+  await expect.poll(() => pageLeft(page, 2)).toBeCloseTo(r.centered, 0);
+});

@@ -116,7 +116,6 @@ export function PageList(props: Props) {
   // 版面視窗高度（clientHeight 不受雙指縮放影響）與頂端安全區
   const [viewport, setViewport] = useState({ h: 0, safe: 0 });
   const [current, setCurrent] = useState(initialIndex);
-  const [flipping, setFlipping] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const pageW = fitPageWidth(width, viewport.h, viewport.safe);
   const pageH = (pageW * PAGE_HEIGHT) / PAGE_WIDTH;
@@ -168,22 +167,33 @@ export function PageList(props: Props) {
     for (const p of mounted) if (!elementsOf(p.id)) load(p.id);
   });
 
+  // 動畫 class 只由這裡控制（不經過 Preact 渲染），連續翻頁時才不會被舊的計時器中途拿掉
+  const animTimer = useRef(0);
+  /** 接下來的位置變化用動畫，結束後拿掉 */
+  const animate = () => {
+    const t = trackRef.current;
+    if (!t) return;
+    t.classList.add('flipping');
+    clearTimeout(animTimer.current);
+    animTimer.current = window.setTimeout(() => t.classList.remove('flipping'), FLIP_MS + 50);
+  };
+  /** 停止動畫：之後的位置變化立刻生效 */
+  const stopAnimation = () => {
+    clearTimeout(animTimer.current);
+    trackRef.current?.classList.remove('flipping');
+  };
+
   /** 翻到第 i 頁；相鄰頁才有滑動動畫（跳很多頁時中間的頁不在 DOM 裡） */
   const flip = (i: number) => {
     if (i === cur) return;
-    setFlipping(Math.abs(i - cur) === 1);
+    if (Math.abs(i - cur) === 1) animate();
+    else stopAnimation();
     setCurrent(i);
   };
 
-  useEffect(() => {
-    if (!flipping) return;
-    const t = setTimeout(() => setFlipping(false), FLIP_MS + 50);
-    return () => clearTimeout(t);
-  }, [flipping, cur]);
-
   // 單指左右拖動：頁面跟著手指走，放開後翻頁或彈回；Pencil 書寫中（手掌）、雙指、放大時不算
-  const latest = useRef({ cur, n, flip, onFlipPastEnd, strideX, pageW });
-  latest.current = { cur, n, flip, onFlipPastEnd, strideX, pageW };
+  const latest = useRef({ cur, n, flip, onFlipPastEnd, strideX, pageW, animate, stopAnimation });
+  latest.current = { cur, n, flip, onFlipPastEnd, strideX, pageW, animate, stopAnimation };
   useEffect(() => {
     const el = ref.current!;
     // 起點與最後位置（iPad 中途接管手勢時會送 pointercancel，用最後位置判斷）
@@ -194,7 +204,19 @@ export function PageList(props: Props) {
     // 已確定是左右拖動（之後每次移動都直接改軌道位置，不經過 Preact 重新渲染）
     let dragging = false;
     let raf = 0;
+    // 開始拖動時軌道在畫面上的位置（翻頁動畫可能還沒播完，從看得到的位置接著拖）
+    let origin = 0;
     const base = () => -latest.current.cur * latest.current.strideX;
+    /** 軌道目前實際的位移（含播放中的動畫） */
+    const visibleX = () => {
+      const t = track();
+      if (!t) return base();
+      try {
+        return new DOMMatrixReadOnly(getComputedStyle(t).transform).m41;
+      } catch {
+        return base();
+      }
+    };
     const track = () => trackRef.current;
     const setArmed = (on: boolean) => {
       if (on) el.dataset.addArmed = '';
@@ -208,10 +230,15 @@ export function PageList(props: Props) {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const t = track();
-        if (!t) return;
-        t.classList.remove('flipping');
-        t.style.transform = `translateX(${base() + offset}px)`;
+        if (t) t.style.transform = `translateX(${origin + offset}px)`;
       });
+    };
+    /** 確定是左右拖動：停在目前看得到的位置，之後從這裡跟手 */
+    const grab = () => {
+      origin = visibleX();
+      latest.current.stopAnimation();
+      const t = track();
+      if (t) t.style.transform = `translateX(${origin}px)`;
     };
     /** 結束拖動：沒有翻頁時用動畫彈回原位 */
     const settle = () => {
@@ -219,9 +246,8 @@ export function PageList(props: Props) {
       setArmed(false);
       const t = track();
       if (!t) return;
-      t.classList.add('flipping');
+      latest.current.animate();
       t.style.transform = `translateX(${base()}px)`;
-      setTimeout(() => t.classList.remove('flipping'), FLIP_MS + 50);
     };
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'pen') {
@@ -256,7 +282,10 @@ export function PageList(props: Props) {
       if (multi || pen || zoomed()) return;
       const dx = e.clientX - t.x;
       const dy = e.clientY - t.y;
-      if (!dragging && Math.abs(dx) > DRAG_LOCK && Math.abs(dx) > Math.abs(dy)) dragging = true;
+      if (!dragging && Math.abs(dx) > DRAG_LOCK && Math.abs(dx) > Math.abs(dy)) {
+        dragging = true;
+        grab();
+      }
       if (dragging) follow(dx, dy);
     };
     const up = (e: PointerEvent) => {
@@ -306,6 +335,8 @@ export function PageList(props: Props) {
     };
   }, []);
 
+  useEffect(() => () => clearTimeout(animTimer.current), []);
+
   useImperativeHandle(
     handle,
     () => ({
@@ -324,7 +355,7 @@ export function PageList(props: Props) {
   return (
     <div class="pages" ref={ref} style={{ height: px(pageH) }} data-current={cur}>
       <div
-        class={flipping ? 'pages-track flipping' : 'pages-track'}
+        class="pages-track"
         ref={trackRef}
         style={{ transform: `translateX(${-cur * strideX}px)` }}
       >
