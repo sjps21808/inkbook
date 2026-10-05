@@ -158,6 +158,16 @@ export function PageList(props: Props) {
     };
   }, []);
 
+  // 沒放大時擋掉單指的原生捲動與回彈：頁面只會左右跟手，上下固定（雙指縮放、放大後的平移照常）
+  useEffect(() => {
+    const el = ref.current!;
+    const lock = (e: TouchEvent) => {
+      if (e.touches.length <= 1 && !zoomed()) e.preventDefault();
+    };
+    el.addEventListener('touchmove', lock, { passive: false });
+    return () => el.removeEventListener('touchmove', lock);
+  }, []);
+
   useEffect(() => onPageChange(cur), [cur]);
 
   const first = Math.max(0, cur - BUFFER);

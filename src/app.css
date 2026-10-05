@@ -218,6 +218,12 @@ html[data-chrome] .toolbar {
   margin: 0;
 }
 
+/* 編輯頁：手指拉到頁面外也不會把整個畫面拉動回彈 */
+html[data-chrome],
+html[data-chrome] body {
+  overscroll-behavior: none;
+}
+
 html[data-chrome] .editor {
   padding-top: calc(16px + env(safe-area-inset-top));
 }
