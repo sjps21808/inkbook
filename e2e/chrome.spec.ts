@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openNewNotebook, waitReady } from './helpers/pen';
+import { drawStroke, elementCount, hLine, openNewNotebook, waitReady } from './helpers/pen';
 
 const toggle = (page: Page, name: '收起選單' | '展開選單') => page.getByRole('button', { name, exact: true });
 
@@ -58,4 +58,42 @@ test('收起狀態下回到書架，頂端列正常顯示', async ({ page }) => 
   await expect(page.getByRole('button', { name: '新增筆記本' })).toBeVisible();
   await expect(page.locator('.topbar')).toBeVisible();
   await expect(page.locator('html')).not.toHaveAttribute('data-chrome');
+});
+
+test('收起時套索選取：右上角可以複製、刪除選取', async ({ page }) => {
+  await drawStroke(page, hLine(0.3));
+  await expect.poll(() => elementCount(page)).toBe(1);
+  await page.getByRole('button', { name: '套索', exact: true }).click();
+  await toggle(page, '收起選單').click();
+  const float = page.locator('.chrome-float');
+  await expect(float.getByRole('button', { name: '刪除選取' })).toHaveCount(0);
+
+  await drawStroke(page, [
+    [0.1, 0.25],
+    [0.9, 0.25],
+    [0.9, 0.35],
+    [0.1, 0.35],
+    [0.1, 0.25],
+  ]);
+  await float.getByRole('button', { name: '複製選取' }).click();
+  await expect.poll(() => elementCount(page)).toBe(2);
+  await float.getByRole('button', { name: '刪除選取' }).click();
+  await expect.poll(() => elementCount(page)).toBe(1);
+  await expect(float.getByRole('button', { name: '刪除選取' })).toHaveCount(0);
+});
+
+test('收起時有新版本：收起按鈕顯示紅點，展開後消失', async ({ page }) => {
+  const dot = () =>
+    page.evaluate(() => getComputedStyle(document.querySelector('.chrome-toggle')!, '::after').content);
+  await toggle(page, '收起選單').click();
+  expect(await dot()).toBe('none');
+  // 模擬 UpdatePrompt 偵測到新版（測試時擋掉 SW）
+  await page.evaluate(() => {
+    const b = document.createElement('button');
+    b.className = 'update-btn';
+    document.querySelector('.topbar')!.append(b);
+  });
+  await expect.poll(dot).not.toBe('none');
+  await toggle(page, '展開選單').click();
+  await expect.poll(dot).toBe('none');
 });

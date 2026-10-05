@@ -195,7 +195,36 @@ html[data-chrome="collapsed"] .toolbar {
   gap: 8px;
 }
 
+.chrome-float .group {
+  display: flex;
+  gap: 4px;
+}
+
+.chrome-float .group button {
+  height: 36px;
+  padding: 0 10px;
+  font-size: 15px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  touch-action: manipulation;
+}
+
+/* 收起時有新版本：收起按鈕上顯示紅點（「有新版本」按鈕在隱藏的頂端列裡） */
+html[data-chrome="collapsed"]:has(.update-btn) .chrome-toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  background: #e53935;
+  border-radius: 50%;
+}
+
 .chrome-toggle {
+  position: relative;
   width: 44px;
   height: 44px;
   padding: 0;

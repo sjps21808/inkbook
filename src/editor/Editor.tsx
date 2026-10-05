@@ -278,6 +278,12 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   return (
     <div class="editor">
       <div class="chrome-float">
+        {collapsed && selection && selection.ids.length > 0 && (
+          <div class="group" aria-label="選取">
+            <button onClick={duplicateSelection}>複製選取</button>
+            <button onClick={deleteSelection}>刪除選取</button>
+          </div>
+        )}
         <button
           class="chrome-toggle"
           aria-label={collapsed ? '展開選單' : '收起選單'}
