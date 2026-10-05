@@ -40,6 +40,18 @@ const NONE: string[] = [];
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/** 頁寬：不超過容器寬度與上限，且整頁（含上下間距、頂端安全區）放得進螢幕高度 */
+export function fitPageWidth(containerW: number, viewportH: number, safeTop: number): number {
+  const byHeight = ((viewportH - safeTop - 2 * GAP) * PAGE_WIDTH) / PAGE_HEIGHT;
+  return Math.max(0, Math.min(containerW, MAX_PAGE_WIDTH, byHeight));
+}
+
+/** 頂端安全區（狀態列）高度：.topbar 的 padding-top = env(safe-area-inset-top) */
+const safeTop = () => {
+  const el = document.querySelector('.topbar');
+  return el ? parseFloat(getComputedStyle(el).paddingTop) || 0 : 0;
+};
+
 /** 工具列下緣（捲動定位時要避開） */
 const stickyBottom = () => document.querySelector('.toolbar')?.getBoundingClientRect().bottom ?? 0;
 
@@ -48,8 +60,10 @@ export function PageList(props: Props) {
     props;
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+  // 版面視窗高度（clientHeight 不受雙指縮放影響）與頂端安全區
+  const [viewport, setViewport] = useState({ h: 0, safe: 0 });
   const [range, setRange] = useState<[number, number]>([0, -1]);
-  const pageW = Math.min(width, MAX_PAGE_WIDTH);
+  const pageW = fitPageWidth(width, viewport.h, viewport.safe);
   const pageH = (pageW * PAGE_HEIGHT) / PAGE_WIDTH;
   const stride = pageH + GAP;
   const n = pages.length;
@@ -59,7 +73,17 @@ export function PageList(props: Props) {
     const ro = new ResizeObserver(() => setWidth(el.clientWidth));
     ro.observe(el);
     setWidth(el.clientWidth);
-    return () => ro.disconnect();
+    const onResize = () => {
+      const h = document.documentElement.clientHeight;
+      const safe = safeTop();
+      setViewport((v) => (v.h === h && v.safe === safe ? v : { h, safe }));
+    };
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 
   // 依捲動位置決定要掛載的頁面
