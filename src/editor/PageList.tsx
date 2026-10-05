@@ -13,8 +13,8 @@ const BUFFER = 1;
 /** 翻頁動畫長度（與 app.css .pages-track.flipping 一致） */
 const FLIP_MS = 280;
 /** 慢慢拖超過頁寬的這個比例才翻頁 */
-const DRAG_RATIO = 0.25;
-/** 最後一頁往後拖超過頁寬的這個比例，放開才新增頁面（比一般翻頁再難一點） */
+const DRAG_RATIO = 0.35;
+/** 最後一頁往後拖超過頁寬的這個比例，放開才新增頁面（快速輕撥不算） */
 const ADD_PAGE_RATIO = 0.35;
 /** 拖動超過這個距離才決定是左右拖（之前不動，避免點一下就晃） */
 const DRAG_LOCK = 8;
@@ -68,12 +68,12 @@ export const safeTop = () => {
 
 /**
  * 手指滑動 → 翻頁方向：往左滑 = 下一頁（+1）、往右滑 = 上一頁（-1）、不算滑動 = 0。
- * 偏水平即可；快速輕撥（≥ 30px 且 ≥ 0.5px/ms）或慢慢拖（超過頁寬 25%，不限時間）都算
+ * 偏水平即可；快速輕撥（≥ 100px 且 ≥ 0.8px/ms）或慢慢拖（超過頁寬 35%，不限時間）都算
  */
 export function swipeStep(dx: number, dy: number, ms: number, pageW: number): -1 | 0 | 1 {
   const ax = Math.abs(dx);
   if (ax <= Math.abs(dy)) return 0;
-  const flick = ax >= 30 && ax / Math.max(ms, 1) >= 0.5;
+  const flick = ax >= 100 && ax / Math.max(ms, 1) >= 0.8;
   if (!flick && ax < pageW * DRAG_RATIO) return 0;
   return dx < 0 ? 1 : -1;
 }

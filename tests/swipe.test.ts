@@ -5,25 +5,25 @@ describe('手指滑動翻頁判斷', () => {
   const W = 800;
 
   it('往左滑 = 下一頁，往右滑 = 上一頁', () => {
-    expect(swipeStep(-120, 10, 200, W)).toBe(1);
-    expect(swipeStep(120, -10, 200, W)).toBe(-1);
+    expect(swipeStep(-300, 10, 200, W)).toBe(1);
+    expect(swipeStep(300, -10, 200, W)).toBe(-1);
   });
 
-  it('快速輕撥：30px 以上且速度 ≥ 0.5px/ms 就算', () => {
-    expect(swipeStep(-30, 0, 60, W)).toBe(1);
-    expect(swipeStep(30, 0, 60, W)).toBe(-1);
-    expect(swipeStep(-29, 0, 10, W)).toBe(0); // 距離不夠
-    expect(swipeStep(-60, 0, 150, W)).toBe(0); // 0.4px/ms 太慢、距離也不到 25%
+  it('快速輕撥：100px 以上且速度 ≥ 0.8px/ms 就算', () => {
+    expect(swipeStep(-100, 0, 125, W)).toBe(1);
+    expect(swipeStep(100, 0, 125, W)).toBe(-1);
+    expect(swipeStep(-99, 0, 10, W)).toBe(0); // 距離不夠
+    expect(swipeStep(-200, 0, 300, W)).toBe(0); // 0.67px/ms 太慢、距離也不到 35%
   });
 
-  it('慢慢拖：超過頁寬 25% 就算，不限時間', () => {
-    expect(swipeStep(-200, 0, 3000, W)).toBe(1);
-    expect(swipeStep(-199, 0, 3000, W)).toBe(0);
+  it('慢慢拖：超過頁寬 35% 就算，不限時間', () => {
+    expect(swipeStep(-280, 0, 3000, W)).toBe(1);
+    expect(swipeStep(-279, 0, 3000, W)).toBe(0);
   });
 
   it('偏垂直方向不算（水平量要大於垂直量）', () => {
-    expect(swipeStep(-100, 100, 100, W)).toBe(0);
-    expect(swipeStep(-100, 90, 100, W)).toBe(1);
+    expect(swipeStep(-150, 150, 100, W)).toBe(0);
+    expect(swipeStep(-150, 140, 100, W)).toBe(1);
   });
 });
 
