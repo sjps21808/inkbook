@@ -133,3 +133,20 @@ test('重新開啟筆記本時翻到上次看的頁面', async ({ page }) => {
   await waitReady(page, 2);
   expect(await currentPage(page)).toBe(2);
 });
+
+test('iPad 中途接管手勢（pointercancel）時，用最後位置判斷翻頁', async ({ page }) => {
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.8, fy: 0.5 },
+    { type: 'pointermove', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 },
+    { type: 'pointercancel', pointerType: 'touch', id: 11, fx: 0, fy: 0 },
+  ]);
+  expect(await currentPage(page)).toBe(1);
+});
+
+test('只點一下不翻頁', async ({ page }) => {
+  await fire(page, [
+    { type: 'pointerdown', pointerType: 'touch', id: 11, fx: 0.5, fy: 0.5 },
+    { type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.505, fy: 0.5 },
+  ]);
+  expect(await currentPage(page)).toBe(0);
+});

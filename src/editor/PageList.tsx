@@ -58,9 +58,15 @@ export const safeTop = () => {
   return el ? parseFloat(getComputedStyle(el).paddingTop) || 0 : 0;
 };
 
-/** 手指滑動 → 翻頁方向：往左滑 = 下一頁（+1）、往右滑 = 上一頁（-1）、不算滑動 = 0 */
+/**
+ * 手指滑動 → 翻頁方向：往左滑 = 下一頁（+1）、往右滑 = 上一頁（-1）、不算滑動 = 0。
+ * 偏水平即可；快速輕撥（≥ 15px 且 ≥ 0.3px/ms）或慢慢拖（≥ 40px，不限時間）都算
+ */
 export function swipeStep(dx: number, dy: number, ms: number): -1 | 0 | 1 {
-  if (ms > 800 || Math.abs(dx) < 50 || Math.abs(dx) < 1.5 * Math.abs(dy)) return 0;
+  const ax = Math.abs(dx);
+  if (ax <= Math.abs(dy)) return 0;
+  const flick = ax >= 15 && ax / Math.max(ms, 1) >= 0.3;
+  if (!flick && ax < 40) return 0;
   return dx < 0 ? 1 : -1;
 }
 
@@ -169,7 +175,8 @@ export function PageList(props: Props) {
   latest.current = { cur, n, flip, bounce };
   useEffect(() => {
     const el = ref.current!;
-    const touches = new Map<number, { x: number; y: number; t: number }>();
+    // 起點與最後位置（iPad 中途接管手勢時會送 pointercancel，用最後位置判斷）
+    const touches = new Map<number, { x: number; y: number; t: number; lx: number; ly: number; lt: number }>();
     let multi = false;
     let pen = false;
     let penDown = false;
@@ -183,8 +190,15 @@ export function PageList(props: Props) {
         multi = false;
         pen = penDown;
       }
-      touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp });
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp, lx: e.clientX, ly: e.clientY, lt: e.timeStamp });
       if (touches.size > 1) multi = true;
+    };
+    const move = (e: PointerEvent) => {
+      const t = touches.get(e.pointerId);
+      if (!t) return;
+      t.lx = e.clientX;
+      t.ly = e.clientY;
+      t.lt = e.timeStamp;
     };
     const up = (e: PointerEvent) => {
       if (e.pointerType === 'pen') {
@@ -194,8 +208,9 @@ export function PageList(props: Props) {
       const start = touches.get(e.pointerId);
       if (!start) return;
       touches.delete(e.pointerId);
-      if (e.type === 'pointercancel' || multi || pen || zoomed()) return;
-      const step = swipeStep(e.clientX - start.x, e.clientY - start.y, e.timeStamp - start.t);
+      if (multi || pen || zoomed()) return;
+      const [x, y, t] = e.type === 'pointercancel' ? [start.lx, start.ly, start.lt] : [e.clientX, e.clientY, e.timeStamp];
+      const step = swipeStep(x - start.x, y - start.y, t - start.t);
       if (!step) return;
       const { cur, n, flip, bounce } = latest.current;
       const next = cur + step;
@@ -203,10 +218,12 @@ export function PageList(props: Props) {
       else flip(next);
     };
     el.addEventListener('pointerdown', down, true);
+    el.addEventListener('pointermove', move, true);
     el.addEventListener('pointerup', up, true);
     el.addEventListener('pointercancel', up, true);
     return () => {
       el.removeEventListener('pointerdown', down, true);
+      el.removeEventListener('pointermove', move, true);
       el.removeEventListener('pointerup', up, true);
       el.removeEventListener('pointercancel', up, true);
     };
