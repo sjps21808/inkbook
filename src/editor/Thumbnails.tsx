@@ -4,6 +4,7 @@ import { listElements } from '../db/repo';
 import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement } from '../db/schema';
 import type { PdfDocs } from '../pdf/render';
 import type { ImageCache } from './images';
+import { safeTop } from './PageList';
 import { renderInk } from './stroke';
 import { drawText } from './text';
 import { drawTemplate } from './templates';
@@ -24,6 +25,8 @@ interface Props {
   pdfDocs: PdfDocs;
   onJump(index: number): void;
   onReorder(from: number, to: number): void;
+  /** 上方選單是否收起（收起時側欄改貼齊頂端安全區） */
+  collapsed: boolean;
 }
 
 const px = (v: number) => `${v}px`;
@@ -61,7 +64,7 @@ async function renderThumb(page: Page, els: PageElement[], images: ImageCache, p
   return URL.createObjectURL(blob!);
 }
 
-export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, onJump, onReorder }: Props) {
+export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, onJump, onReorder, collapsed }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const urls = useRef(new Map<string, { url: string; v: number }>());
   const pending = useRef(new Set<string>());
@@ -96,7 +99,7 @@ export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, o
 
   // 側欄貼在工具列下方
   useLayoutEffect(() => {
-    const place = () => setTop(document.querySelector('.toolbar')?.getBoundingClientRect().bottom ?? 0);
+    const place = () => setTop(Math.max(document.querySelector('.toolbar')?.getBoundingClientRect().bottom ?? 0, safeTop()));
     place();
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, { passive: true });
@@ -104,7 +107,7 @@ export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, o
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place);
     };
-  }, []);
+  }, [collapsed]);
 
   // 捲入可見範圍才產生縮圖
   useEffect(() => {

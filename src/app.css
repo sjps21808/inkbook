@@ -160,6 +160,54 @@ html, body {
   border-bottom: 1px solid var(--border);
 }
 
+/* 編輯頁（<html data-chrome>）：頂端列與工具列浮在頁面上方，不占版面，收起時隱藏 */
+html[data-chrome] .topbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  padding-right: 68px; /* 讓出右上角的收起按鈕 */
+}
+
+html[data-chrome] .toolbar {
+  position: fixed;
+  top: calc(52px + env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  margin: 0;
+}
+
+html[data-chrome] .editor {
+  padding-top: calc(16px + env(safe-area-inset-top));
+}
+
+html[data-chrome="collapsed"] .topbar,
+html[data-chrome="collapsed"] .toolbar {
+  display: none;
+}
+
+.chrome-float {
+  position: fixed;
+  top: calc(4px + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chrome-toggle {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 18px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  opacity: 0.7;
+  touch-action: manipulation;
+}
+
 .toolbar .group {
   display: flex;
   gap: 4px;

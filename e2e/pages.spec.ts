@@ -62,6 +62,9 @@ test('刪除頁面要確認；undo 會還原頁面與筆畫並捲回該頁；重
   await addPage(page, '空白');
   await addPage(page, '空白');
   await expect.poll(() => pageCount(page)).toBe(3);
+  // 等 App 新增頁面後自己捲到新頁完成，再捲到第 2 頁（否則 App 的捲動會蓋掉）
+  await waitReady(page, 2);
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   await scrollToPage(page, 1);
   await drawStroke(page, hLine(0.3), 'pen', 1);
   await expect.poll(() => elementCount(page)).toBe(1);

@@ -47,7 +47,7 @@ export function fitPageWidth(containerW: number, viewportH: number, safeTop: num
 }
 
 /** 頂端安全區（狀態列）高度：.topbar 的 padding-top = env(safe-area-inset-top) */
-const safeTop = () => {
+export const safeTop = () => {
   const el = document.querySelector('.topbar');
   return el ? parseFloat(getComputedStyle(el).paddingTop) || 0 : 0;
 };
@@ -130,7 +130,7 @@ export function PageList(props: Props) {
         if (i < 0 && fallbackIndex !== undefined) i = clamp(fallbackIndex, 0, n - 1);
         if (i < 0 || !stride) return;
         const top = ref.current!.getBoundingClientRect().top + i * stride;
-        const visibleTop = stickyBottom();
+        const visibleTop = Math.max(stickyBottom(), safeTop());
         // 已經完整在畫面上就不捲動
         if (top >= visibleTop && top + pageH <= window.innerHeight) return;
         window.scrollTo({ top: window.scrollY + top - visibleTop - GAP });

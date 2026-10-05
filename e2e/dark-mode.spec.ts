@@ -25,15 +25,19 @@ async function painted(page: Page, clip: { x: number; y: number; width: number; 
   }, b64);
 }
 
-/** 元素的背景色：取元素上緣往下 3px、水平置中的像素（避開文字與圓角）；body 取視窗左下角 */
-async function bgColor(page: Page, selector: string): Promise<string> {
+/**
+ * 元素的背景色：取元素上緣往下 3px、水平置中的像素（避開文字與圓角）；body 取視窗左下角。
+ * edge = 'bottom' 改取下緣往上 3px（頁面上緣會被浮在上方的選單蓋住）
+ */
+async function bgColor(page: Page, selector: string, edge: 'top' | 'bottom' = 'top'): Promise<string> {
   let x: number, y: number;
   if (selector === 'body') {
     const vp = page.viewportSize()!;
     [x, y] = [2, vp.height - 2];
   } else {
     const box = (await page.locator(selector).first().boundingBox())!;
-    [x, y] = [Math.floor(box.x + box.width / 2), Math.floor(box.y + 3)];
+    const y0 = edge === 'top' ? box.y + 3 : box.y + box.height - 3;
+    [x, y] = [Math.floor(box.x + box.width / 2), Math.floor(y0)];
   }
   const [[r, g, b]] = await painted(page, { x, y, width: 1, height: 1 });
   return `rgb(${r}, ${g}, ${b})`;
@@ -59,7 +63,7 @@ test.describe('深色模式', () => {
     // 按鈕文字是淺色（#f2f2f7）
     expect(await brightest(page, '.toolbar button')).toBeGreaterThan(200);
 
-    expect(await bgColor(page, '.page')).toBe(WHITE);
+    expect(await bgColor(page, '.page', 'bottom')).toBe(WHITE);
     expect(await bgPixel(page, [300, 400])).toEqual([255, 255, 255, 255]);
 
     await page.getByRole('button', { name: '頁面', exact: true }).click();
@@ -83,7 +87,7 @@ test('淺色模式維持原本的配色', async ({ page }) => {
   await openNewNotebook(page);
   expect(await bgColor(page, 'body')).toBe('rgb(242, 242, 245)');
   expect(await bgColor(page, '.toolbar')).toBe('rgb(249, 249, 251)');
-  expect(await bgColor(page, '.page')).toBe(WHITE);
+  expect(await bgColor(page, '.page', 'bottom')).toBe(WHITE);
 });
 
 const theme = (page: Page) => page.getByRole('combobox', { name: '外觀' });
@@ -106,7 +110,7 @@ test.describe('外觀選單', () => {
     await theme(page).selectOption({ label: '深色' });
     expect(await bgColor(page, 'body')).toBe('rgb(0, 0, 0)');
     expect(await bgColor(page, '.toolbar')).toBe('rgb(22, 22, 24)');
-    expect(await bgColor(page, '.page')).toBe(WHITE);
+    expect(await bgColor(page, '.page', 'bottom')).toBe(WHITE);
 
     await page.reload();
     await waitReady(page);

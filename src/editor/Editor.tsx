@@ -17,6 +17,7 @@ import { runExport } from '../export/ExportDialog';
 import { PdfDocs } from '../pdf/render';
 import { transformElement } from './geometry';
 import { ImageCache } from './images';
+import { loadCollapsed, saveCollapsed } from './chrome';
 import { blurEditing } from './text';
 import { elementsCommand, History, type Command, type ElementStore } from './history';
 import { PageActions } from './PageActions';
@@ -45,6 +46,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   // 每頁內容的版本（縮圖據此重新產生）
   const [versions, setVersions] = useState<Record<string, number>>({});
   const [showThumbs, setShowThumbs] = useState(false);
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
   const cacheRef = useRef<Cache>(cache);
   const loading = useRef(new Set<string>());
   const listRef = useRef<PageListHandle>(null);
@@ -259,10 +261,32 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
       })
       .finally(refresh);
   };
+  // <html data-chrome>：編輯頁的頂端列與工具列改成浮在頁面上方，收起時隱藏（見 app.css）
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.chrome = collapsed ? 'collapsed' : 'expanded';
+    return () => root.removeAttribute('data-chrome');
+  }, [collapsed]);
+
+  const toggleChrome = () => {
+    saveCollapsed(!collapsed);
+    setCollapsed(!collapsed);
+  };
+
   const execute = (cmd: Command) => run(() => history.execute(cmd).then(() => cmd));
 
   return (
     <div class="editor">
+      <div class="chrome-float">
+        <button
+          class="chrome-toggle"
+          aria-label={collapsed ? '展開選單' : '收起選單'}
+          aria-expanded={!collapsed}
+          onClick={toggleChrome}
+        >
+          {collapsed ? '▾' : '▴'}
+        </button>
+      </div>
       <Toolbar
         title={notebook.title}
         onBack={onBack}
@@ -313,6 +337,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
           pdfDocs={pdfDocs}
           onJump={(i) => listRef.current?.scrollToPage(pages[i].id)}
           onReorder={(from, to) => execute(reorderCommand(from, to))}
+          collapsed={collapsed}
         />
       )}
       <PageList
