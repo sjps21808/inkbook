@@ -299,7 +299,14 @@ test('翻頁動畫還沒播完就再拖：頁面從看得到的位置接著動�
     fire('pointerdown', 0.8);
     fire('pointermove', 0.5);
     fire('pointerup', 0.2);
-    await frame();
+    // 等 Preact 套用新位置、動畫開始後暫停在 100ms（不受機器快慢影響，確定停在半路）
+    await new Promise((res) => setTimeout(res, 0));
+    const track = document.querySelector<HTMLElement>('.pages-track')!;
+    getComputedStyle(track).transform;
+    const anim = track.getAnimations()[0];
+    if (!anim) return null;
+    anim.pause();
+    anim.currentTime = 100;
     const before = left(1);
     // 馬上再拖 12px（同一個 task 內讀位置與開始拖動）
     const w = document.querySelector('.page')!.getBoundingClientRect().width;
@@ -307,6 +314,7 @@ test('翻頁動畫還沒播完就再拖：頁面從看得到的位置接著動�
     fire('pointermove', 0.6 - 12 / w);
     // 開始拖動的當下頁面停在看得到的位置（位移下一個 frame 才套用）
     const frozen = left(1);
+    const animations = track.getAnimations().length;
     await frame();
     await frame();
     const during = left(1);
@@ -314,19 +322,20 @@ test('翻頁動畫還沒播完就再拖：頁面從看得到的位置接著動�
       const c = pages.getBoundingClientRect();
       return c.left + (c.width - w) / 2;
     })();
-    return { before, frozen, during, centered };
+    return { before, frozen, during, centered, animations };
   });
+  expect(r).not.toBeNull(); // 翻頁有動畫
   // 動畫中途：第 2 頁還沒到中間
-  expect(r.before).toBeGreaterThan(r.centered + 20);
-  // 開始拖動時停在動畫路徑上（讀 before 之後動畫可能又往中間走了一點），沒有跳過中間
-  expect(r.frozen).toBeLessThanOrEqual(r.before);
-  expect(r.frozen).toBeGreaterThanOrEqual(r.centered - 0.5);
+  expect(r!.before).toBeGreaterThan(r!.centered + 20);
+  // 開始拖動時停在看得到的位置，動畫停止
+  expect(r!.frozen).toBeCloseTo(r!.before, 0);
+  expect(r!.animations).toBe(0);
   // 之後從停住的位置跟著手指往左 12px（舊版會直接跳到「中間 − 12px」）
-  expect(r.during).toBeCloseTo(r.frozen - 12, 0);
+  expect(r!.during).toBeCloseTo(r!.frozen - 12, 0);
 
   // 放開（快速輕撥）→ 翻到第 3 頁，最後停在中間
   await fire(page, [{ type: 'pointerup', pointerType: 'touch', id: 11, fx: 0.2, fy: 0.5 }]);
   await expect.poll(() => currentPage(page)).toBe(2);
   await waitReady(page, 2);
-  await expect.poll(() => pageLeft(page, 2)).toBeCloseTo(r.centered, 0);
+  await expect.poll(() => pageLeft(page, 2)).toBeCloseTo(r!.centered, 0);
 });
