@@ -47,6 +47,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   const [versions, setVersions] = useState<Record<string, number>>({});
   const [showThumbs, setShowThumbs] = useState(false);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const [current, setCurrent] = useState(0);
   const cacheRef = useRef<Cache>(cache);
   const loading = useRef(new Set<string>());
   const listRef = useRef<PageListHandle>(null);
@@ -304,6 +305,25 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         onRedo={() => run(() => history.redo())}
         onAction={onAction}
       >
+        <div class="group page-nav" aria-label="翻頁">
+          <button
+            aria-label="上一頁"
+            disabled={current <= 0}
+            onClick={() => listRef.current?.goToPage(pages[current - 1].id)}
+          >
+            ‹
+          </button>
+          <span class="page-no">
+            {Math.min(current, pages.length - 1) + 1} / {pages.length}
+          </span>
+          <button
+            aria-label="下一頁"
+            disabled={current >= pages.length - 1}
+            onClick={() => listRef.current?.goToPage(pages[current + 1].id)}
+          >
+            ›
+          </button>
+        </div>
         {selection && selection.ids.length > 0 && (
           <div class="group" aria-label="選取">
             <button onClick={duplicateSelection}>複製選取</button>
@@ -360,6 +380,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         selection={selection}
         onSelect={(pageId, ids) => setSelection(ids.length ? { pageId, ids } : null)}
         pdfDocs={pdfDocs}
+        onPageChange={setCurrent}
       />
     </div>
   );

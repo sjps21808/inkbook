@@ -92,3 +92,29 @@ test('雙指與上下滑動不翻頁', async ({ page }) => {
   ]);
   expect(await currentPage(page)).toBe(0);
 });
+
+test('工具列翻頁按鈕與頁碼', async ({ page }) => {
+  const prev = page.getByRole('button', { name: '上一頁' });
+  const next = page.getByRole('button', { name: '下一頁' });
+  const no = page.locator('.page-no');
+  await expect(no).toHaveText('1 / 3');
+  await expect(prev).toBeDisabled();
+  await next.click();
+  await expect(no).toHaveText('2 / 3');
+  expect(await currentPage(page)).toBe(1);
+  await next.click();
+  await expect(no).toHaveText('3 / 3');
+  await expect(next).toBeDisabled();
+  await prev.click();
+  await expect(no).toHaveText('2 / 3');
+  // 滑動翻頁也會更新頁碼
+  await swipe(page, -1);
+  await expect(no).toHaveText('1 / 3');
+});
+
+test('選單收起時翻頁按鈕隱藏，仍可滑動翻頁', async ({ page }) => {
+  await page.getByRole('button', { name: '收起選單' }).click();
+  await expect(page.getByRole('button', { name: '下一頁' })).toBeHidden();
+  await swipe(page, 1);
+  expect(await currentPage(page)).toBe(1);
+});

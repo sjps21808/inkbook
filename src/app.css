@@ -297,6 +297,13 @@ textarea,
   user-select: text;
 }
 
+.toolbar .page-no {
+  align-self: center;
+  min-width: 4.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .toolbar .nb-title {
   align-self: center;
   max-width: 12em;

@@ -34,6 +34,8 @@ interface Props {
   onSelect(pageId: string, ids: string[]): void;
   handle: Ref<PageListHandle>;
   pdfDocs: PdfDocs;
+  /** 目前頁改變（含第一次顯示） */
+  onPageChange(index: number): void;
 }
 
 const px = (v: number) => `${v}px`;
@@ -64,8 +66,22 @@ export function swipeStep(dx: number, dy: number, ms: number): -1 | 0 | 1 {
 const zoomed = () => (window.visualViewport?.scale ?? 1) > 1.01;
 
 export function PageList(props: Props) {
-  const { pages, elementsOf, load, images, pen, onStroke, tool, option, onCommit, selection, onSelect, handle, pdfDocs } =
-    props;
+  const {
+    pages,
+    elementsOf,
+    load,
+    images,
+    pen,
+    onStroke,
+    tool,
+    option,
+    onCommit,
+    selection,
+    onSelect,
+    handle,
+    pdfDocs,
+    onPageChange,
+  } = props;
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   // 版面視窗高度（clientHeight 不受雙指縮放影響）與頂端安全區
@@ -113,6 +129,8 @@ export function PageList(props: Props) {
       root.removeAttribute('data-zoomed');
     };
   }, []);
+
+  useEffect(() => onPageChange(cur), [cur]);
 
   const first = Math.max(0, cur - BUFFER);
   const mounted = pages.slice(first, cur + BUFFER + 1);
