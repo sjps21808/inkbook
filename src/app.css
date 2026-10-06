@@ -209,18 +209,63 @@ html[data-zoomed] .page {
 }
 
 /* 編輯頁（<html data-chrome>）：頂端列與工具列浮在頁面上方，不占版面，收起時隱藏 */
+/* 書架：頂端列（包在 .app-hud 裡）黏在上方 */
+.app-hud {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* 編輯頁：浮在頁面上的介面都在 .hud 裡。放大時平移到看得到的區域並縮回 1/倍率，維持原本大小
+   （變數由 editor/hud.ts 依 visualViewport 設定）；transform 讓裡面 position: fixed 的元素改以 .hud 定位 */
+html[data-chrome] .hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform-origin: 0 0;
+  transform: translate(var(--vv-x, 0px), var(--vv-y, 0px)) scale(var(--vv-inv, 1));
+}
+
+html[data-chrome] .hud > * {
+  pointer-events: auto;
+}
+
 html[data-chrome] .topbar {
   position: fixed;
   left: 0;
   right: 0;
 }
 
-html[data-chrome] .toolbar {
+/* 大選單與浮動列上下排在同一個容器：浮動列自然貼在大選單下方；大選單收起時容器移到頂端 */
+.menu-stack {
   position: fixed;
-  z-index: 25; /* 高於浮動列：大選單的彈出選單（新增頁面的模板等）不會被浮動列蓋住 */
   top: calc(52px + env(safe-area-inset-top));
   left: 0;
   right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+html[data-chrome="collapsed"] .menu-stack {
+  top: calc(8px + env(safe-area-inset-top));
+}
+
+.menu-stack > * {
+  pointer-events: auto;
+}
+
+html[data-chrome] .toolbar {
+  position: relative;
+  z-index: 25; /* 高於浮動列：大選單的彈出選單（新增頁面的模板等）不會被浮動列蓋住 */
+  top: auto;
+  align-self: stretch;
   margin: 0;
 }
 
@@ -239,11 +284,9 @@ html[data-chrome="collapsed"] .toolbar {
   display: none;
 }
 
-/* 浮動快捷列：上方中央的圓角膠囊；大選單展開時由 QuickBar 設定 top 貼在它下面 */
+/* 浮動快捷列：上方中央的圓角膠囊（位置由 .menu-stack 決定） */
 .quickbar {
-  position: fixed;
-  top: calc(8px + env(safe-area-inset-top));
-  left: 50%;
+  position: relative;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -254,7 +297,6 @@ html[data-chrome="collapsed"] .toolbar {
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  transform: translateX(-50%);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }

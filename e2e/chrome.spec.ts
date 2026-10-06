@@ -46,6 +46,12 @@ test('浮動列：大選單展開時貼在它下方，收起時移到頂端', as
   await toggle(page, '展開選單').click();
   await expect(menu(page)).toBeVisible();
   await expect.poll(() => topOf(page, '.quickbar')).toBeCloseTo((await bottomOf(page, '.toolbar')) + 8, 0);
+  // 大選單展開狀態下重新整理：浮動列仍在大選單下方，不會被蓋住
+  await page.reload();
+  await waitReady(page);
+  await expect(menu(page)).toBeVisible();
+  await expect.poll(() => topOf(page, '.quickbar')).toBeCloseTo((await bottomOf(page, '.toolbar')) + 8, 0);
+  await quick(page).getByRole('button', { name: '粗' }).click();
   await toggle(page, '收起選單').click();
   await expect.poll(() => topOf(page, '.quickbar')).toBeLessThan(20);
 });

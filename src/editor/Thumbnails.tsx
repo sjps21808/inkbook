@@ -4,6 +4,7 @@ import { listElements } from '../db/repo';
 import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement } from '../db/schema';
 import type { PdfDocs } from '../pdf/render';
 import type { ImageCache } from './images';
+import { toHudY } from './hud';
 import { safeTop } from './PageList';
 import { renderInk } from './stroke';
 import { drawText } from './text';
@@ -25,8 +26,6 @@ interface Props {
   pdfDocs: PdfDocs;
   onJump(index: number): void;
   onReorder(from: number, to: number): void;
-  /** 大選單是否收起（浮動列位置跟著變，側欄要重新定位） */
-  collapsed: boolean;
 }
 
 const px = (v: number) => `${v}px`;
@@ -64,7 +63,7 @@ async function renderThumb(page: Page, els: PageElement[], images: ImageCache, p
   return URL.createObjectURL(blob!);
 }
 
-export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, onJump, onReorder, collapsed }: Props) {
+export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, onJump, onReorder }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const urls = useRef(new Map<string, { url: string; v: number }>());
   const pending = useRef(new Set<string>());
@@ -97,18 +96,20 @@ export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, o
       });
   };
 
-  // 側欄貼在浮動快捷列下方
+  // 側欄貼在大選單＋浮動列（.menu-stack）下方；大選單展開／收起時容器高度一定會變，ResizeObserver 會通知
   useLayoutEffect(() => {
+    const stack = document.querySelector('.menu-stack');
     const place = () =>
-      setTop(Math.max((document.querySelector('.quickbar')?.getBoundingClientRect().bottom ?? 0) + 8, safeTop()));
+      setTop(Math.max(stack ? toHudY(stack, stack.getBoundingClientRect().bottom) + 8 : 0, safeTop()));
     place();
+    const ro = new ResizeObserver(place);
+    if (stack) ro.observe(stack);
     window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, { passive: true });
     return () => {
+      ro.disconnect();
       window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place);
     };
-  }, [collapsed]);
+  }, []);
 
   // 捲入可見範圍才產生縮圖
   useEffect(() => {

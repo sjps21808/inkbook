@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { ColorPicker } from './ColorPicker';
 import { useDismiss } from './dismiss';
 import {
@@ -41,28 +41,6 @@ interface Props {
   hasSelection: boolean;
   onDuplicate(): void;
   onDeleteSelection(): void;
-}
-
-/** 大選單下緣（展開時浮動列貼在它下面；收起時貼齊頂端安全區，見 app.css） */
-function useMenuBottom(menuOpen: boolean) {
-  const [bottom, setBottom] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const menu = document.querySelector('.toolbar');
-    if (!menuOpen || !menu) {
-      setBottom(null);
-      return;
-    }
-    const update = () => setBottom(menu.getBoundingClientRect().bottom);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(menu);
-    window.addEventListener('resize', update);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', update);
-    };
-  }, [menuOpen]);
-  return bottom;
 }
 
 /** 快捷列上的工具按鈕；有選項的工具（橡皮擦）選中後再點一次，跳出選項小選單 */
@@ -112,14 +90,8 @@ function ToolButton({ id, state, onChange }: { id: string; state: ToolState; onC
 
 export function QuickBar(props: Props) {
   const { state, onChange, canUndo, canRedo, onUndo, onRedo, menuOpen, onToggleMenu, hasSelection } = props;
-  const menuBottom = useMenuBottom(menuOpen);
   return (
-    <div
-      class="quickbar"
-      role="toolbar"
-      aria-label="快捷工具"
-      style={menuBottom === null ? undefined : { top: `${menuBottom + 8}px` }}
-    >
+    <div class="quickbar" role="toolbar" aria-label="快捷工具">
       <button
         class="menu-toggle"
         aria-label={menuOpen ? '收起選單' : '展開選單'}

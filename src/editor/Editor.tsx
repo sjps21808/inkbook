@@ -26,6 +26,7 @@ import { PageActions } from './PageActions';
 import type { NewStroke, PenSettings } from './PageCanvas';
 import { PageList, type PageListHandle } from './PageList';
 import { QuickBar } from './QuickBar';
+import { useHudViewport } from './hud';
 import { Thumbnails } from './Thumbnails';
 import { Toolbar, toolOption, type ToolState } from './Toolbar';
 import { COLORS, tools, type ToolDef } from './tools';
@@ -285,6 +286,8 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     execute(addPageCommand(pages.length, nextPageTemplate(last, notebook.template)));
   };
 
+  useHudViewport();
+
   const toggleChrome = () => {
     saveCollapsed(!collapsed);
     setCollapsed(!collapsed);
@@ -294,76 +297,80 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
 
   return (
     <div class="editor">
-      <QuickBar
-        state={toolState}
-        onChange={onToolChange}
-        canUndo={history.canUndo}
-        canRedo={history.canRedo}
-        onUndo={() => run(() => history.undo())}
-        onRedo={() => run(() => history.redo())}
-        menuOpen={!collapsed}
-        onToggleMenu={toggleChrome}
-        hasSelection={!!selection && selection.ids.length > 0}
-        onDuplicate={duplicateSelection}
-        onDeleteSelection={deleteSelection}
-      />
-      <Toolbar title={notebook.title} onBack={onBack} state={toolState} onChange={onToolChange} onAction={onAction}>
-        <div class="group page-nav" aria-label="翻頁">
-          <button
-            aria-label="上一頁"
-            disabled={current <= 0}
-            onClick={() => listRef.current?.goToPage(pages[current - 1].id)}
-          >
-            ‹
-          </button>
-          <span class="page-no">
-            {Math.min(current, pages.length - 1) + 1} / {pages.length}
-          </span>
-          <button
-            aria-label="下一頁"
-            onClick={() =>
-              current >= pages.length - 1 ? addPageAtEnd() : listRef.current?.goToPage(pages[current + 1].id)
-            }
-          >
-            ›
-          </button>
+      {/* 浮在頁面上的介面：放大時反向縮放，維持原本大小（見 hud.ts） */}
+      <div class="hud">
+        <div class="menu-stack">
+          <Toolbar title={notebook.title} onBack={onBack} state={toolState} onChange={onToolChange} onAction={onAction}>
+            <div class="group page-nav" aria-label="翻頁">
+              <button
+                aria-label="上一頁"
+                disabled={current <= 0}
+                onClick={() => listRef.current?.goToPage(pages[current - 1].id)}
+              >
+                ‹
+              </button>
+              <span class="page-no">
+                {Math.min(current, pages.length - 1) + 1} / {pages.length}
+              </span>
+              <button
+                aria-label="下一頁"
+                onClick={() =>
+                  current >= pages.length - 1 ? addPageAtEnd() : listRef.current?.goToPage(pages[current + 1].id)
+                }
+              >
+                ›
+              </button>
+            </div>
+            <div class="group">
+              <button aria-pressed={showThumbs} onClick={() => setShowThumbs((s) => !s)}>
+                頁面
+              </button>
+            </div>
+            <div class="group">
+              <button
+                onClick={() => {
+                  blurEditing(); // 編輯中的文字先存檔
+                  runExport(db, notebook);
+                }}
+              >
+                匯出 PDF
+              </button>
+            </div>
+            <PageActions
+              defaultTemplate={notebook.template}
+              canDelete={pages.length > 1}
+              currentIndex={() => listRef.current?.currentIndex() ?? 0}
+              onAdd={(after, template) => execute(addPageCommand(after + 1, template))}
+              onDelete={(index) => execute(deletePageCommand(pages[index], index))}
+            />
+          </Toolbar>
+          <QuickBar
+            state={toolState}
+            onChange={onToolChange}
+            canUndo={history.canUndo}
+            canRedo={history.canRedo}
+            onUndo={() => run(() => history.undo())}
+            onRedo={() => run(() => history.redo())}
+            menuOpen={!collapsed}
+            onToggleMenu={toggleChrome}
+            hasSelection={!!selection && selection.ids.length > 0}
+            onDuplicate={duplicateSelection}
+            onDeleteSelection={deleteSelection}
+          />
         </div>
-        <div class="group">
-          <button aria-pressed={showThumbs} onClick={() => setShowThumbs((s) => !s)}>
-            頁面
-          </button>
-        </div>
-        <div class="group">
-          <button
-            onClick={() => {
-              blurEditing(); // 編輯中的文字先存檔
-              runExport(db, notebook);
-            }}
-          >
-            匯出 PDF
-          </button>
-        </div>
-        <PageActions
-          defaultTemplate={notebook.template}
-          canDelete={pages.length > 1}
-          currentIndex={() => listRef.current?.currentIndex() ?? 0}
-          onAdd={(after, template) => execute(addPageCommand(after + 1, template))}
-          onDelete={(index) => execute(deletePageCommand(pages[index], index))}
-        />
-      </Toolbar>
-      {showThumbs && (
-        <Thumbnails
-          db={db}
-          images={images}
-          pages={pages}
-          elementsOf={(id) => cache[id]}
-          versions={versions}
-          pdfDocs={pdfDocs}
-          onJump={(i) => listRef.current?.goToPage(pages[i].id)}
-          onReorder={(from, to) => execute(reorderCommand(from, to))}
-          collapsed={collapsed}
-        />
-      )}
+        {showThumbs && (
+          <Thumbnails
+            db={db}
+            images={images}
+            pages={pages}
+            elementsOf={(id) => cache[id]}
+            versions={versions}
+            pdfDocs={pdfDocs}
+            onJump={(i) => listRef.current?.goToPage(pages[i].id)}
+            onReorder={(from, to) => execute(reorderCommand(from, to))}
+          />
+        )}
+      </div>
       <PageList
         handle={listRef}
         pages={pages}

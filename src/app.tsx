@@ -36,12 +36,14 @@ export function App() {
 
   return (
     <>
-      <header class="topbar">
-        <h1>InkBook</h1>
-        <span class="version">版本 {__APP_VERSION__}</span>
-        <ThemeSelect />
-        <UpdatePrompt />
-      </header>
+      <div class="hud app-hud">
+        <header class="topbar">
+          <h1>InkBook</h1>
+          <span class="version">版本 {__APP_VERSION__}</span>
+          <ThemeSelect />
+          <UpdatePrompt />
+        </header>
+      </div>
       <main>
         {!db ? (
           <p class="empty">載入中…</p>
