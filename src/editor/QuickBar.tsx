@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
-import { useLayoutEffect, useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { ColorPicker } from './ColorPicker';
+import { useDismiss } from './dismiss';
 import {
   DuplicateIcon,
   EraserIcon,
@@ -13,7 +14,7 @@ import {
   UndoIcon,
   WidthIcon,
 } from './icons';
-import type { ToolState } from './Toolbar';
+import { toolOption, type ToolState } from './Toolbar';
 import { tools, WIDTH_LABELS } from './tools';
 
 /** 浮動快捷列上的工具（其餘工具在大選單） */
@@ -64,6 +65,51 @@ function useMenuBottom(menuOpen: boolean) {
   return bottom;
 }
 
+/** 快捷列上的工具按鈕；有選項的工具（橡皮擦）選中後再點一次，跳出選項小選單 */
+function ToolButton({ id, state, onChange }: { id: string; state: ToolState; onChange(s: ToolState): void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useDismiss(ref, open, () => setOpen(false));
+  const t = tools.find((x) => x.id === id)!;
+  const ToolIcon = TOOL_ICONS[id];
+  const active = state.toolId === id;
+  return (
+    <span class="tool-button" ref={ref}>
+      <button
+        aria-label={t.label}
+        aria-pressed={active}
+        aria-haspopup={t.options ? 'true' : undefined}
+        aria-expanded={t.options ? open : undefined}
+        onClick={() => {
+          if (active && t.options) setOpen((o) => !o);
+          else {
+            setOpen(false);
+            onChange({ ...state, toolId: id });
+          }
+        }}
+      >
+        <ToolIcon />
+      </button>
+      {open && t.options && (
+        <div class="tool-options" role="group" aria-label={`${t.label}模式`}>
+          {t.options.map((o) => (
+            <button
+              key={o.id}
+              aria-pressed={toolOption(state, t) === o.id}
+              onClick={() => {
+                onChange({ ...state, options: { ...state.options, [id]: o.id } });
+                setOpen(false);
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
+
 export function QuickBar(props: Props) {
   const { state, onChange, canUndo, canRedo, onUndo, onRedo, menuOpen, onToggleMenu, hasSelection } = props;
   const menuBottom = useMenuBottom(menuOpen);
@@ -83,20 +129,9 @@ export function QuickBar(props: Props) {
         <MenuIcon />
       </button>
       <span class="sep" />
-      {QUICK_TOOLS.map((id) => {
-        const t = tools.find((x) => x.id === id)!;
-        const ToolIcon = TOOL_ICONS[id];
-        return (
-          <button
-            key={id}
-            aria-label={t.label}
-            aria-pressed={state.toolId === id}
-            onClick={() => onChange({ ...state, toolId: id })}
-          >
-            <ToolIcon />
-          </button>
-        );
-      })}
+      {QUICK_TOOLS.map((id) => (
+        <ToolButton key={id} id={id} state={state} onChange={onChange} />
+      ))}
       <span class="sep" />
       {WIDTH_LABELS.map((label, i) => (
         <button

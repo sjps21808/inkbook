@@ -26,7 +26,6 @@ interface Props {
 /** 大選單（☰ 拉出）：浮動快捷列以外的工具與頁面操作 */
 export function Toolbar(props: Props) {
   const { title, onBack, state, onChange, onAction, children } = props;
-  const active = tools.find((t) => t.id === state.toolId)!;
   return (
     <div class="toolbar" role="toolbar" aria-label="工具列">
       <div class="group">
@@ -46,19 +45,6 @@ export function Toolbar(props: Props) {
           </button>
           ))}
       </div>
-      {active.options && (
-        <div class="group" aria-label={`${active.label}選項`}>
-          {active.options.map((o) => (
-            <button
-              key={o.id}
-              aria-pressed={toolOption(state, active) === o.id}
-              onClick={() => onChange({ ...state, options: { ...state.options, [active.id]: o.id } })}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
       {children}
     </div>
   );

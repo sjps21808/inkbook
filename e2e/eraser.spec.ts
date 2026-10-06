@@ -15,7 +15,11 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('預設為局部擦除：從中間擦斷成兩段，undo 還原成一筆', async ({ page }) => {
+  // 選中的橡皮擦再點一次：跳出模式選單，預設局部
+  await button(page, '橡皮擦').click();
   await expect(button(page, '局部')).toHaveAttribute('aria-pressed', 'true');
+  await button(page, '局部').click();
+  await expect(button(page, '局部')).toHaveCount(0);
   await drawStroke(page, vLine(0.5, 0.25, 0.35));
   await expect.poll(() => elementCount(page)).toBe(2);
   expect((await inkPixel(page, [0.5, 0.3]))[3]).toBe(0);
@@ -44,6 +48,7 @@ test('整筆擦除：碰到就整筆刪掉', async ({ page }) => {
   await drawStroke(page, hLine(0.6));
   await expect.poll(() => elementCount(page)).toBe(2);
   await button(page, '橡皮擦').click();
+  await button(page, '橡皮擦').click(); // 再點一次：模式選單
   await button(page, '整筆').click();
   await drawStroke(page, vLine(0.5, 0.25, 0.35));
   await expect.poll(() => elementCount(page)).toBe(1);
@@ -60,4 +65,16 @@ test('沒碰到筆畫時不產生動作', async ({ page }) => {
   await drawStroke(page, vLine(0.5, 0.6, 0.7));
   await button(page, '復原').click();
   await expect.poll(() => elementCount(page)).toBe(0); // 復原的是畫線，而不是擦除
+});
+
+test('橡皮擦模式選單：只有選中的橡皮擦再點才出現，點外面關閉，大選單裡沒有模式按鈕', async ({ page }) => {
+  // beforeEach 已選了橡皮擦；換成筆再選橡皮擦 → 只是切換工具，不跳選單
+  await button(page, '筆').click();
+  await button(page, '橡皮擦').click();
+  await expect(page.getByRole('group', { name: '橡皮擦模式' })).toHaveCount(0);
+  await button(page, '橡皮擦').click();
+  await expect(page.getByRole('group', { name: '橡皮擦模式' })).toBeVisible();
+  await page.mouse.click(400, 900);
+  await expect(page.getByRole('group', { name: '橡皮擦模式' })).toHaveCount(0);
+  await expect(page.getByRole('toolbar', { name: '工具列' }).getByRole('button', { name: '局部' })).toHaveCount(0);
 });

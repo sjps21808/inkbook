@@ -259,7 +259,8 @@ html[data-chrome="collapsed"] .toolbar {
   backdrop-filter: blur(12px);
 }
 
-.quickbar > button {
+.quickbar > button,
+.quickbar .tool-button > button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -273,13 +274,50 @@ html[data-chrome="collapsed"] .toolbar {
   touch-action: manipulation;
 }
 
-.quickbar > button[aria-pressed="true"] {
+.quickbar > button[aria-pressed="true"],
+.quickbar .tool-button > button[aria-pressed="true"] {
   color: #0a84ff;
   background: var(--quickbar-active);
 }
 
 .quickbar > button:disabled {
   opacity: 0.35;
+}
+
+.tool-button {
+  position: relative;
+}
+
+/* 橡皮擦「局部／整筆」小選單 */
+.tool-options {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  transform: translateX(-50%);
+}
+
+.tool-options button {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 15px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.tool-options button[aria-pressed="true"] {
+  border-color: #0a84ff;
+  box-shadow: inset 0 0 0 1px #0a84ff;
 }
 
 .quickbar .sep {

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
+import { useDismiss } from './dismiss';
 import { COLORS } from './tools';
 
 interface Props {
@@ -11,14 +12,7 @@ export function ColorPicker({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const outside = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', outside, true);
-    return () => document.removeEventListener('pointerdown', outside, true);
-  }, [open]);
+  useDismiss(ref, open, () => setOpen(false));
 
   const name = COLORS.find((c) => c.value === value)?.name ?? '';
   return (
