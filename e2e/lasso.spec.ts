@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { drawStroke, elementCount, hLine, inkPixel, openNewNotebook, type Pt } from './helpers/pen';
+import { drawStroke, elementCount, hLine, inkPixel, openNewNotebook, pickColor, type Pt } from './helpers/pen';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
@@ -82,7 +82,7 @@ test('拖右下角把手 = 等比放大', async ({ page }) => {
 });
 
 test('選取時點顏色 = 改色', async ({ page }) => {
-  await button(page, '紅').click();
+  await pickColor(page, '紅');
   await expect.poll(async () => (await inkPixel(page, [0.5, 0.3]))[0]).toBeGreaterThan(200);
   const other = await inkPixel(page, [0.5, 0.6]);
   expect(Math.max(other[0], other[1], other[2])).toBeLessThan(60);

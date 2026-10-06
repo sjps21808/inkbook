@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { drawStroke, elementCount, openNewNotebook, waitReady, type Pt } from './helpers/pen';
+import { drawStroke, elementCount, openNewNotebook, pickColor, waitReady, type Pt } from './helpers/pen';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
@@ -31,7 +31,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('點一下新增文字框，輸入後點別處存檔，重新整理後還在', async ({ page }) => {
-  await button(page, '紅').click();
+  await pickColor(page, '紅');
   await tap(page, [0.3, 0.3]);
   await expect(editor(page)).toBeFocused();
   await page.keyboard.type('你好 InkBook');

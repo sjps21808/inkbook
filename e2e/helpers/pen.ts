@@ -66,6 +66,12 @@ export function elementCount(page: Page) {
   );
 }
 
+/** 點顏色圓圈打開色盤，選一個顏色 */
+export async function pickColor(page: Page, name: string) {
+  await page.getByRole('button', { name: /^顏色：/ }).click();
+  await page.getByRole('group', { name: '選擇顏色' }).getByRole('button', { name, exact: true }).click();
+}
+
 /** 從書架新增一本筆記本並開啟 */
 export async function openNewNotebook(page: Page, title = '測試筆記') {
   await page.goto('./');

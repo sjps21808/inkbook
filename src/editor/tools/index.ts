@@ -31,15 +31,24 @@ export const tools: ToolDef[] = [
   { id: 'text', label: '文字', stroke: 'pen', widths: [12, 16, 24], pointer: textSession },
 ];
 
+/** 16 色，依 4×4 色盤的順序（原本 8 色的色碼不變，舊筆跡的顏色才對得上） */
 export const COLORS: { name: string; value: string }[] = [
   { name: '黑', value: '#1c1c1e' },
+  { name: '深灰', value: '#48484a' },
   { name: '灰', value: '#8e8e93' },
+  { name: '棕', value: '#795548' },
   { name: '紅', value: '#e53935' },
+  { name: '粉紅', value: '#d81b60' },
   { name: '橙', value: '#fb8c00' },
   { name: '黃', value: '#fdd835' },
+  { name: '黃綠', value: '#7cb342' },
   { name: '綠', value: '#43a047' },
+  { name: '青綠', value: '#00897b' },
+  { name: '天藍', value: '#039be5' },
   { name: '藍', value: '#1e88e5' },
+  { name: '深藍', value: '#3949ab' },
   { name: '紫', value: '#8e24aa' },
+  { name: '淡紫', value: '#ba68c8' },
 ];
 
 export const WIDTH_LABELS = ['細', '中', '粗'] as const;

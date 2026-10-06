@@ -1,5 +1,6 @@
 import type { ComponentChildren } from 'preact';
-import { COLORS, tools, WIDTH_LABELS, type ToolDef } from './tools';
+import { ColorPicker } from './ColorPicker';
+import { tools, WIDTH_LABELS, type ToolDef } from './tools';
 
 export interface ToolState {
   toolId: string;
@@ -60,16 +61,7 @@ export function Toolbar(props: Props) {
         </div>
       )}
       <div class="group">
-        {COLORS.map((c) => (
-          <button
-            key={c.value}
-            class="swatch"
-            aria-label={c.name}
-            aria-pressed={state.color === c.value}
-            style={{ background: c.value }}
-            onClick={() => onChange({ ...state, color: c.value })}
-          />
-        ))}
+        <ColorPicker value={state.color} onChange={(color) => onChange({ ...state, color })} />
       </div>
       <div class="group">
         {WIDTH_LABELS.map((label, i) => (

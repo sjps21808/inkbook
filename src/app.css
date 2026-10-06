@@ -322,6 +322,33 @@ html[data-chrome="collapsed"]:has(.update-btn) .chrome-toggle::after {
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px #0a84ff;
 }
 
+.color-picker {
+  position: relative;
+}
+
+/* 4×4 色盤 */
+.color-grid {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(4, 36px);
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  transform: translateX(-50%);
+}
+
+.color-grid .swatch {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+}
+
 /* 全域關閉文字選取，但輸入框要能打字 */
 input,
 textarea,
