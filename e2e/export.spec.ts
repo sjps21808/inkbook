@@ -2,7 +2,9 @@ import type { Page } from '@playwright/test';
 import { PDFDict, PDFDocument, PDFName, PDFRawStream, type PDFPage } from 'pdf-lib';
 import { expect, test } from './helpers/persistent';
 import { importPdfFile, makePdf, toBuffer } from './helpers/pdf';
-import { drawStroke, elementCount, hLine, openNewNotebook, waitReady } from './helpers/pen';
+import { drawStroke, elementCount, hLine, openNewNotebook, waitReady, menuOpenByDefault } from './helpers/pen';
+
+test.beforeEach(({ page }) => menuOpenByDefault(page));
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 

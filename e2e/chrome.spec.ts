@@ -2,71 +2,97 @@ import { expect, test, type Page } from '@playwright/test';
 import { drawStroke, elementCount, hLine, openNewNotebook, waitReady } from './helpers/pen';
 
 const toggle = (page: Page, name: '收起選單' | '展開選單') => page.getByRole('button', { name, exact: true });
+const menu = (page: Page) => page.getByRole('toolbar', { name: '工具列' });
+const quick = (page: Page) => page.getByRole('toolbar', { name: '快捷工具' });
 
-/** 第 1 頁頂端附近的點是不是落在頁面上（沒有被選單蓋住），以及整頁是否在螢幕內 */
-const pageTop = (page: Page) =>
+/** 第 1 頁整頁在螢幕內 */
+const pageInView = (page: Page) =>
   page.evaluate(() => {
     const r = document.querySelector('.page[data-index="0"]')!.getBoundingClientRect();
-    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + 10);
-    return {
-      onPage: !!hit?.closest('.page'),
-      inView: r.top >= 0 && r.bottom <= document.documentElement.clientHeight,
-    };
+    return r.top >= 0 && r.bottom <= document.documentElement.clientHeight;
   });
+const bottomOf = (page: Page, selector: string) =>
+  page.evaluate((s) => document.querySelector(s)!.getBoundingClientRect().bottom, selector);
+const topOf = (page: Page, selector: string) =>
+  page.evaluate((s) => document.querySelector(s)!.getBoundingClientRect().top, selector);
 
 test.beforeEach(async ({ page }) => {
-  await openNewNotebook(page);
+  await openNewNotebook(page, '測試筆記', false);
 });
 
-test('預設展開；收起後選單隱藏、整頁可見，重新整理後維持', async ({ page }) => {
-  await expect(page.getByRole('toolbar', { name: '工具列' })).toBeVisible();
-  await expect(page.locator('.topbar')).toBeVisible();
-
-  await toggle(page, '收起選單').click();
-  await expect(page.getByRole('toolbar', { name: '工具列' })).toBeHidden();
+test('預設收起：只有浮動列；展開後大選單出現，重新整理後維持；收起後也維持', async ({ page }) => {
+  await expect(quick(page)).toBeVisible();
+  await expect(menu(page)).toBeHidden();
   await expect(page.locator('.topbar')).toBeHidden();
-  expect(await pageTop(page)).toEqual({ onPage: true, inView: true });
-
-  await page.reload();
-  await waitReady(page);
-  await expect(page.getByRole('toolbar', { name: '工具列' })).toBeHidden();
+  expect(await pageInView(page)).toBe(true);
 
   await toggle(page, '展開選單').click();
-  await expect(page.getByRole('toolbar', { name: '工具列' })).toBeVisible();
+  await expect(menu(page)).toBeVisible();
+  await expect(page.locator('.topbar')).toBeVisible();
   await page.reload();
   await waitReady(page);
-  await expect(page.getByRole('toolbar', { name: '工具列' })).toBeVisible();
+  await expect(menu(page)).toBeVisible();
+
+  await toggle(page, '收起選單').click();
+  await expect(menu(page)).toBeHidden();
+  await page.reload();
+  await waitReady(page);
+  await expect(menu(page)).toBeHidden();
+  await expect(quick(page)).toBeVisible();
 });
 
-test('展開時選單浮在頁面上方，切換不改變頁面大小與捲動位置', async ({ page }) => {
+test('浮動列：大選單展開時貼在它下方，收起時移到頂端', async ({ page }) => {
+  expect(await topOf(page, '.quickbar')).toBeLessThan(20);
+  await toggle(page, '展開選單').click();
+  await expect(menu(page)).toBeVisible();
+  await expect.poll(() => topOf(page, '.quickbar')).toBeCloseTo((await bottomOf(page, '.toolbar')) + 8, 0);
+  await toggle(page, '收起選單').click();
+  await expect.poll(() => topOf(page, '.quickbar')).toBeLessThan(20);
+});
+
+test('展開或收起大選單不改變頁面大小與位置', async ({ page }) => {
   const box = () =>
     page.evaluate(() => {
       const r = document.querySelector('.page-slot')!.getBoundingClientRect();
-      return { top: r.top, w: r.width, scrollY: window.scrollY };
+      return { top: r.top, left: r.left, w: r.width };
     });
-  await page.evaluate(() => window.scrollTo(0, 300));
   const before = await box();
-  await toggle(page, '收起選單').click();
-  expect(await box()).toEqual(before);
   await toggle(page, '展開選單').click();
+  expect(await box()).toEqual(before);
+  await toggle(page, '收起選單').click();
   expect(await box()).toEqual(before);
 });
 
-test('收起狀態下回到書架，頂端列正常顯示', async ({ page }) => {
-  await toggle(page, '收起選單').click();
+test('大選單收起時回到書架，頂端列正常顯示', async ({ page }) => {
   await page.goBack();
   await expect(page.getByRole('button', { name: '新增筆記本' })).toBeVisible();
   await expect(page.locator('.topbar')).toBeVisible();
   await expect(page.locator('html')).not.toHaveAttribute('data-chrome');
 });
 
-test('收起時套索選取：右上角可以複製、刪除選取', async ({ page }) => {
+test('浮動列切換工具與粗細；大選單裡沒有重複的工具', async ({ page }) => {
+  const q = quick(page);
+  await expect(q.getByRole('button', { name: '筆', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await q.getByRole('button', { name: '螢光筆' }).click();
+  await expect(q.getByRole('button', { name: '螢光筆' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(q.getByRole('button', { name: '筆', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await q.getByRole('button', { name: '粗' }).click();
+  await expect(q.getByRole('button', { name: '粗' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(q.getByRole('button', { name: '中' })).toHaveAttribute('aria-pressed', 'false');
+
+  await toggle(page, '展開選單').click();
+  for (const name of ['筆', '螢光筆', '橡皮擦', '套索', '細', '中', '粗', '復原', '重做'])
+    await expect(menu(page).getByRole('button', { name, exact: true })).toHaveCount(0);
+  for (const name of ['‹ 書架', '圖片', '文字', '頁面', '匯出 PDF', '新增頁面', '刪除頁面'])
+    await expect(menu(page).getByRole('button', { name, exact: true })).toBeVisible();
+});
+
+test('套索選取時浮動列出現複製、刪除選取', async ({ page }) => {
   await drawStroke(page, hLine(0.3));
   await expect.poll(() => elementCount(page)).toBe(1);
-  await page.getByRole('button', { name: '套索', exact: true }).click();
-  await toggle(page, '收起選單').click();
-  const float = page.locator('.chrome-float');
-  await expect(float.getByRole('button', { name: '刪除選取' })).toHaveCount(0);
+  const q = quick(page);
+  await q.getByRole('button', { name: '套索', exact: true }).click();
+  await expect(q.getByRole('button', { name: '刪除選取' })).toHaveCount(0);
 
   await drawStroke(page, [
     [0.1, 0.25],
@@ -75,17 +101,16 @@ test('收起時套索選取：右上角可以複製、刪除選取', async ({ pa
     [0.1, 0.35],
     [0.1, 0.25],
   ]);
-  await float.getByRole('button', { name: '複製選取' }).click();
+  await q.getByRole('button', { name: '複製選取' }).click();
   await expect.poll(() => elementCount(page)).toBe(2);
-  await float.getByRole('button', { name: '刪除選取' }).click();
+  await q.getByRole('button', { name: '刪除選取' }).click();
   await expect.poll(() => elementCount(page)).toBe(1);
-  await expect(float.getByRole('button', { name: '刪除選取' })).toHaveCount(0);
+  await expect(q.getByRole('button', { name: '刪除選取' })).toHaveCount(0);
 });
 
-test('收起時有新版本：收起按鈕顯示紅點，展開後消失', async ({ page }) => {
+test('大選單收起時有新版本：☰ 顯示紅點，展開後消失', async ({ page }) => {
   const dot = () =>
-    page.evaluate(() => getComputedStyle(document.querySelector('.chrome-toggle')!, '::after').content);
-  await toggle(page, '收起選單').click();
+    page.evaluate(() => getComputedStyle(document.querySelector('.menu-toggle')!, '::after').content);
   expect(await dot()).toBe('none');
   // 模擬 UpdatePrompt 偵測到新版（測試時擋掉 SW）
   await page.evaluate(() => {

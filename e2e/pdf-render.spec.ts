@@ -1,7 +1,9 @@
 import type { Page } from '@playwright/test';
-import { bgPixel, drawStroke, elementCount, goToPage, hLine, inkPixel, waitReady } from './helpers/pen';
+import { bgPixel, drawStroke, elementCount, goToPage, hLine, inkPixel, waitReady, menuOpenByDefault } from './helpers/pen';
 import { importPdfFile, makePdf } from './helpers/pdf';
 import { expect, test } from './helpers/persistent';
+
+test.beforeEach(({ page }) => menuOpenByDefault(page));
 
 /** 是否接近黑色（PDF 中央塗黑的方塊） */
 const dark = ([r, g, b]: number[]) => r < 60 && g < 60 && b < 60;

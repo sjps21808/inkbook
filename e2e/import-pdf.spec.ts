@@ -1,7 +1,9 @@
 import { test as ephemeral } from '@playwright/test';
 import { expect, test } from './helpers/persistent';
-import { pageCount, waitReady } from './helpers/pen';
+import { pageCount, waitReady, menuOpenByDefault } from './helpers/pen';
 import { importPdfFile, makePdf, toBuffer } from './helpers/pdf';
+
+test.beforeEach(({ page }) => menuOpenByDefault(page));
 
 test('匯入混合尺寸的 PDF：建立筆記本並開啟，每個 PDF 頁一頁', async ({ page }) => {
   const errors: string[] = [];

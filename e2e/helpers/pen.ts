@@ -72,13 +72,32 @@ export async function pickColor(page: Page, name: string) {
   await page.getByRole('group', { name: '選擇顏色' }).getByRole('button', { name, exact: true }).click();
 }
 
-/** 從書架新增一本筆記本並開啟 */
-export async function openNewNotebook(page: Page, title = '測試筆記') {
+/**
+ * 讓這個測試裡開啟的筆記本一律展開大選單（自行建立筆記本、匯入 PDF 的測試用；
+ * 預設收起的行為由 chrome.spec 驗證）
+ */
+export async function menuOpenByDefault(page: Page) {
+  await page.addInitScript(() => localStorage.setItem('inkbook.toolbarCollapsed', '0'));
+}
+
+/** 大選單收起時把它展開（展開狀態會記住，重新整理後維持） */
+export async function openMenu(page: Page) {
+  const toggle = page.getByRole('button', { name: '展開選單', exact: true });
+  if (await toggle.isVisible()) await toggle.click();
+  await page.getByRole('button', { name: '收起選單', exact: true }).waitFor();
+}
+
+/**
+ * 從書架新增一本筆記本並開啟。
+ * 大選單預設收起；多數測試要用到大選單裡的按鈕，所以預設把它展開（menu = false 維持預設）
+ */
+export async function openNewNotebook(page: Page, title = '測試筆記', menu = true) {
   await page.goto('./');
   await page.getByRole('button', { name: '新增筆記本' }).click();
   await page.getByLabel('筆記本標題').fill(title);
   await page.getByRole('button', { name: '建立' }).click();
   await waitReady(page);
+  if (menu) await openMenu(page);
 }
 
 /** 等第 index 頁的 element 載入完成（之後才能書寫） */

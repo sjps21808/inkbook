@@ -1,7 +1,9 @@
 import { PDFDocument } from 'pdf-lib';
-import { drawStroke, elementCount, hLine, waitReady } from './helpers/pen';
+import { drawStroke, elementCount, hLine, menuOpenByDefault, waitReady } from './helpers/pen';
 import { makePdf } from './helpers/pdf';
 import { expect, test } from './helpers/persistent';
+
+test.beforeEach(({ page }) => menuOpenByDefault(page));
 
 // 專案沒有 @types/node；用變數動態 import 避免 tsc 解析模組型別
 const nodeFs = 'node:fs/promises';

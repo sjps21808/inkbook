@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { menuOpenByDefault } from './helpers/pen';
+
+test.beforeEach(({ page }) => menuOpenByDefault(page));
+
 const setLastBackupAt = (page: Page, value: number) =>
   page.evaluate(
     (value) =>

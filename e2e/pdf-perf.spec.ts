@@ -1,6 +1,8 @@
-import { bgPixel, goToPage, pageCount, waitReady } from './helpers/pen';
+import { bgPixel, goToPage, menuOpenByDefault, pageCount, waitReady } from './helpers/pen';
 import { makePdf } from './helpers/pdf';
 import { expect, test } from './helpers/persistent';
+
+test.beforeEach(({ page }) => menuOpenByDefault(page));
 
 // 實測（Windows 本機 Playwright WebKit）：每個 IndexedDB 請求固定約 15ms，500 頁的 Page 寫入就佔約 7.7 秒，
 // pdf.js 讀取頁數與尺寸約 0.3 秒。CI（ubuntu）與 iPad 預期不受這個限制（未驗證）

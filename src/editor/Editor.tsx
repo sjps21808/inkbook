@@ -25,6 +25,7 @@ import { elementsCommand, History, type Command, type ElementStore } from './his
 import { PageActions } from './PageActions';
 import type { NewStroke, PenSettings } from './PageCanvas';
 import { PageList, type PageListHandle } from './PageList';
+import { QuickBar } from './QuickBar';
 import { Thumbnails } from './Thumbnails';
 import { Toolbar, toolOption, type ToolState } from './Toolbar';
 import { COLORS, tools, type ToolDef } from './tools';
@@ -265,7 +266,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
       })
       .finally(refresh);
   };
-  // <html data-chrome>：編輯頁的頂端列與工具列改成浮在頁面上方，收起時隱藏（見 app.css）
+  // <html data-chrome>：編輯頁的大選單（頂端列 + 工具列）浮在頁面上方，收起時隱藏（見 app.css）
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.chrome = collapsed ? 'collapsed' : 'expanded';
@@ -293,33 +294,20 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
 
   return (
     <div class="editor">
-      <div class="chrome-float">
-        {collapsed && selection && selection.ids.length > 0 && (
-          <div class="group" aria-label="選取">
-            <button onClick={duplicateSelection}>複製選取</button>
-            <button onClick={deleteSelection}>刪除選取</button>
-          </div>
-        )}
-        <button
-          class="chrome-toggle"
-          aria-label={collapsed ? '展開選單' : '收起選單'}
-          aria-expanded={!collapsed}
-          onClick={toggleChrome}
-        >
-          {collapsed ? '▾' : '▴'}
-        </button>
-      </div>
-      <Toolbar
-        title={notebook.title}
-        onBack={onBack}
+      <QuickBar
         state={toolState}
         onChange={onToolChange}
         canUndo={history.canUndo}
         canRedo={history.canRedo}
         onUndo={() => run(() => history.undo())}
         onRedo={() => run(() => history.redo())}
-        onAction={onAction}
-      >
+        menuOpen={!collapsed}
+        onToggleMenu={toggleChrome}
+        hasSelection={!!selection && selection.ids.length > 0}
+        onDuplicate={duplicateSelection}
+        onDeleteSelection={deleteSelection}
+      />
+      <Toolbar title={notebook.title} onBack={onBack} state={toolState} onChange={onToolChange} onAction={onAction}>
         <div class="group page-nav" aria-label="翻頁">
           <button
             aria-label="上一頁"
@@ -340,12 +328,6 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
             ›
           </button>
         </div>
-        {selection && selection.ids.length > 0 && (
-          <div class="group" aria-label="選取">
-            <button onClick={duplicateSelection}>複製選取</button>
-            <button onClick={deleteSelection}>刪除選取</button>
-          </div>
-        )}
         <div class="group">
           <button aria-pressed={showThumbs} onClick={() => setShowThumbs((s) => !s)}>
             頁面

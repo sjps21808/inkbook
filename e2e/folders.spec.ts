@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { menuOpenByDefault } from './helpers/pen';
+
+test.beforeEach(({ page }) => menuOpenByDefault(page));
+
 async function newFolder(page: Page, name: string) {
   await page.getByRole('button', { name: '新增資料夾' }).click();
   await page.getByLabel('資料夾名稱').fill(name);

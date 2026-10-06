@@ -25,7 +25,7 @@ interface Props {
   pdfDocs: PdfDocs;
   onJump(index: number): void;
   onReorder(from: number, to: number): void;
-  /** 上方選單是否收起（收起時側欄改貼齊頂端安全區） */
+  /** 大選單是否收起（浮動列位置跟著變，側欄要重新定位） */
   collapsed: boolean;
 }
 
@@ -97,9 +97,10 @@ export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, o
       });
   };
 
-  // 側欄貼在工具列下方
+  // 側欄貼在浮動快捷列下方
   useLayoutEffect(() => {
-    const place = () => setTop(Math.max(document.querySelector('.toolbar')?.getBoundingClientRect().bottom ?? 0, safeTop()));
+    const place = () =>
+      setTop(Math.max((document.querySelector('.quickbar')?.getBoundingClientRect().bottom ?? 0) + 8, safeTop()));
     place();
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, { passive: true });

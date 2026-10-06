@@ -13,6 +13,8 @@
   --reminder-fg: #6b4e00;
   --reminder-bg: #fff4d6;
   --reminder-border: #f0d58a;
+  --quickbar-bg: rgba(255, 255, 255, 0.9);
+  --quickbar-active: rgba(10, 132, 255, 0.12);
 }
 
 /* 深色模式：只改 UI，頁面維持白紙（CLAUDE.md §5 M7）。
@@ -32,6 +34,8 @@
     --reminder-fg: #ffd98a;
     --reminder-bg: #3a2f12;
     --reminder-border: #6b5520;
+    --quickbar-bg: rgba(44, 44, 46, 0.9);
+    --quickbar-active: rgba(10, 132, 255, 0.22);
   }
 }
 
@@ -50,6 +54,8 @@
   --reminder-fg: #ffd98a;
   --reminder-bg: #3a2f12;
   --reminder-border: #6b5520;
+  --quickbar-bg: rgba(44, 44, 46, 0.9);
+  --quickbar-active: rgba(10, 132, 255, 0.22);
 }
 
 :root[data-theme="light"] {
@@ -207,11 +213,11 @@ html[data-chrome] .topbar {
   position: fixed;
   left: 0;
   right: 0;
-  padding-right: 68px; /* 讓出右上角的收起按鈕 */
 }
 
 html[data-chrome] .toolbar {
   position: fixed;
+  z-index: 25; /* 高於浮動列：大選單的彈出選單（新增頁面的模板等）不會被浮動列蓋住 */
   top: calc(52px + env(safe-area-inset-top));
   left: 0;
   right: 0;
@@ -233,56 +239,90 @@ html[data-chrome="collapsed"] .toolbar {
   display: none;
 }
 
-.chrome-float {
+/* 浮動快捷列：上方中央的圓角膠囊；大選單展開時由 QuickBar 設定 top 貼在它下面 */
+.quickbar {
   position: fixed;
-  top: calc(4px + env(safe-area-inset-top));
-  right: 12px;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 50%;
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.chrome-float .group {
-  display: flex;
-  gap: 4px;
-}
-
-.chrome-float .group button {
-  height: 36px;
-  padding: 0 10px;
-  font-size: 15px;
-  color: var(--fg);
-  background: var(--surface);
+  gap: 2px;
+  max-width: calc(100vw - 16px);
+  padding: 4px 8px;
+  background: var(--quickbar-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateX(-50%);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.quickbar > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--fg);
+  background: none;
+  border: none;
+  border-radius: 10px;
   touch-action: manipulation;
 }
 
-/* 收起時有新版本：收起按鈕上顯示紅點（「有新版本」按鈕在隱藏的頂端列裡） */
-html[data-chrome="collapsed"]:has(.update-btn) .chrome-toggle::after {
+.quickbar > button[aria-pressed="true"] {
+  color: #0a84ff;
+  background: var(--quickbar-active);
+}
+
+.quickbar > button:disabled {
+  opacity: 0.35;
+}
+
+.quickbar .sep {
+  width: 1px;
+  height: 24px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+.quickbar .color-picker > .swatch {
+  width: 28px;
+  height: 28px;
+  margin: 0 8px;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.color-grid .swatch[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px #0a84ff;
+}
+
+.color-grid .swatch {
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+}
+
+/* 大選單收起時有新版本：☰ 上顯示紅點（「有新版本」按鈕在隱藏的頂端列裡） */
+.menu-toggle {
+  position: relative;
+}
+
+html[data-chrome="collapsed"]:has(.update-btn) .menu-toggle::after {
   content: "";
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 6px;
+  right: 6px;
   width: 10px;
   height: 10px;
   background: #e53935;
   border-radius: 50%;
-}
-
-.chrome-toggle {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  font-size: 18px;
-  color: var(--fg);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  opacity: 0.7;
-  touch-action: manipulation;
 }
 
 .toolbar .group {

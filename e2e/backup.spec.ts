@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { drawStroke, elementCount, hLine, inkPixel, waitReady } from './helpers/pen';
+import { drawStroke, elementCount, hLine, inkPixel, waitReady, menuOpenByDefault } from './helpers/pen';
+
+test.beforeEach(({ page }) => menuOpenByDefault(page));
 
 const lastBackupAt = (page: Page) =>
   page.evaluate(

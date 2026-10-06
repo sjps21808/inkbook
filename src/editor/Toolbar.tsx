@@ -1,6 +1,6 @@
 import type { ComponentChildren } from 'preact';
-import { ColorPicker } from './ColorPicker';
-import { tools, WIDTH_LABELS, type ToolDef } from './tools';
+import { QUICK_TOOLS } from './QuickBar';
+import { tools, type ToolDef } from './tools';
 
 export interface ToolState {
   toolId: string;
@@ -17,18 +17,15 @@ interface Props {
   onBack(): void;
   state: ToolState;
   onChange(s: ToolState): void;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo(): void;
-  onRedo(): void;
   /** 點一次性動作的工具（例如圖片） */
   onAction(tool: ToolDef): void;
   /** 工具列尾端的其他按鈕（頁面操作） */
   children?: ComponentChildren;
 }
 
+/** 大選單（☰ 拉出）：浮動快捷列以外的工具與頁面操作 */
 export function Toolbar(props: Props) {
-  const { title, onBack, state, onChange, canUndo, canRedo, onUndo, onRedo, onAction, children } = props;
+  const { title, onBack, state, onChange, onAction, children } = props;
   const active = tools.find((t) => t.id === state.toolId)!;
   return (
     <div class="toolbar" role="toolbar" aria-label="工具列">
@@ -37,7 +34,9 @@ export function Toolbar(props: Props) {
         <span class="nb-title">{title}</span>
       </div>
       <div class="group">
-        {tools.map((t) => (
+        {tools
+          .filter((t) => !QUICK_TOOLS.includes(t.id))
+          .map((t) => (
           <button
             key={t.id}
             aria-pressed={t.action ? undefined : state.toolId === t.id}
@@ -45,7 +44,7 @@ export function Toolbar(props: Props) {
           >
             {t.label}
           </button>
-        ))}
+          ))}
       </div>
       {active.options && (
         <div class="group" aria-label={`${active.label}選項`}>
@@ -60,24 +59,6 @@ export function Toolbar(props: Props) {
           ))}
         </div>
       )}
-      <div class="group">
-        <ColorPicker value={state.color} onChange={(color) => onChange({ ...state, color })} />
-      </div>
-      <div class="group">
-        {WIDTH_LABELS.map((label, i) => (
-          <button key={label} aria-pressed={state.widthIdx === i} onClick={() => onChange({ ...state, widthIdx: i })}>
-            {label}
-          </button>
-        ))}
-      </div>
-      <div class="group">
-        <button disabled={!canUndo} onClick={onUndo}>
-          復原
-        </button>
-        <button disabled={!canRedo} onClick={onRedo}>
-          重做
-        </button>
-      </div>
       {children}
     </div>
   );
