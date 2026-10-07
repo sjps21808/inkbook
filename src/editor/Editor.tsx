@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { InkDatabase } from '../db/db';
 import {
@@ -29,13 +30,16 @@ import { QuickBar } from './QuickBar';
 import { useHudViewport } from './hud';
 import { Thumbnails } from './Thumbnails';
 import { Toolbar, toolOption, type ToolState } from './Toolbar';
-import { COLORS, tools, type ToolDef } from './tools';
+import { tools, type ToolDef } from './tools';
+import { loadToolState, saveToolState } from './toolMemory';
 
 interface Props {
   db: InkDatabase;
   notebook: Notebook;
   initialPages: Page[];
   onBack(): void;
+  /** 筆記本分頁列（放在頂端固定區域最上面） */
+  tabBar?: ComponentChildren;
 }
 
 type Cache = Record<string, PageElement[]>;
@@ -43,7 +47,7 @@ type Cache = Record<string, PageElement[]>;
 /** 等 Preact 把狀態更新畫到畫面上 */
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
-export function Editor({ db, notebook, initialPages, onBack }: Props) {
+export function Editor({ db, notebook, initialPages, onBack, tabBar }: Props) {
   const [pages, setPages] = useState(initialPages);
   // 已載入頁面的 element；ref 同步更新，讓連續書寫時 z 不會重複
   const [cache, setCache] = useState<Cache>({});
@@ -65,12 +69,10 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   useEffect(() => () => pdfDocs.destroy(), [pdfDocs]);
   const [, rerender] = useState(0);
   const refresh = () => rerender((n) => n + 1);
-  const [toolState, setToolState] = useState<ToolState>({
-    toolId: 'pen',
-    color: COLORS[0].value,
-    widthIdx: 1,
-    options: {},
-  });
+  // 這本筆記本上次用的工具、顏色、粗細（切換分頁回來時恢復）
+  const [toolState, setToolState] = useState<ToolState>(() => loadToolState(notebook.id));
+  // layout effect：選完工具馬上切分頁也來得及存
+  useLayoutEffect(() => saveToolState(notebook.id, toolState), [toolState]);
   const tool = tools.find((t) => t.id === toolState.toolId)!;
   const [selection, setSelection] = useState<{ pageId: string; ids: string[] } | null>(null);
   const pen: PenSettings = { tool: tool.stroke, color: toolState.color, width: tool.widths[toolState.widthIdx] };
@@ -271,7 +273,8 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
       .finally(refresh);
   };
   // <html data-chrome>：編輯頁的大選單（頂端列 + 工具列）浮在頁面上方，收起時隱藏（見 app.css）
-  useEffect(() => {
+  // layout effect：離開編輯頁時同步拿掉，回書架不會閃一下編輯頁的版面
+  useLayoutEffect(() => {
     const root = document.documentElement;
     root.dataset.chrome = collapsed ? 'collapsed' : 'expanded';
     return () => root.removeAttribute('data-chrome');
@@ -321,6 +324,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
       <div class="hud">
         {/* 頂端固定區域：不蓋住白紙 */}
         <div class="top-band" ref={bandRef}>
+          {tabBar}
           <QuickBar
             state={toolState}
             onChange={onToolChange}

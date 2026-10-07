@@ -166,7 +166,7 @@ test('重新開啟筆記本時翻到上次看的頁面', async ({ page }) => {
   await expect(page.locator('.page-no')).toHaveText('3 / 3');
   // 從書架重新開啟也一樣
   await page.getByRole('button', { name: '‹ 書架' }).click();
-  await page.getByText('測試筆記').click();
+  await page.locator('.notebook-card', { hasText: '測試筆記' }).click();
   await waitReady(page, 2);
   expect(await currentPage(page)).toBe(2);
 });

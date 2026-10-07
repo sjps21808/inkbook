@@ -256,6 +256,96 @@ html[data-chrome] .topbar {
   border-bottom: 1px solid var(--border);
 }
 
+/* 筆記本分頁列：太多時左右滑動；「＋」固定在最右邊 */
+.tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.app-hud .tabs-row {
+  padding: calc(6px + env(safe-area-inset-top)) 8px 6px;
+  background: var(--bg);
+}
+
+/* 書架頁：分頁列在頂端列上面，狀態列的空間由分頁列讓出 */
+.app-hud .tabs-row + .topbar {
+  padding-top: 0;
+}
+
+.tabbar {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabbar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  width: 160px;
+  height: 34px;
+  padding-left: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.tab[aria-selected="true"] {
+  background: var(--surface);
+  border-color: #0a84ff;
+}
+
+.tab-title {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  font-size: 14px;
+  color: var(--fg);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: none;
+}
+
+.tab[aria-selected="true"] .tab-title {
+  font-weight: 600;
+}
+
+.tab-close,
+.tab-add {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 18px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  touch-action: manipulation;
+}
+
+.tab-add {
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
 /* 大選單（頂端列＋工具列）從頂端固定區域下方展開，蓋在白紙上 */
 html[data-chrome] .topbar {
   top: var(--band-h, 0px);

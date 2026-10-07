@@ -1,6 +1,6 @@
 // 雙指放大時選單不跟著放大：浮在頁面上的介面都包在 .hud 裡，
 // 依 visualViewport 把 .hud 平移到看得到的區域並縮回 1/倍率（CSS 見 app.css html[data-chrome] .hud）
-import { useEffect } from 'preact/hooks';
+import { useLayoutEffect } from 'preact/hooks';
 
 /** 把 visualViewport 的位移與倍率寫進 <html> 的 CSS 變數 */
 export function syncViewport(): void {
@@ -20,7 +20,7 @@ const SETTLE_MS = 500;
  * 所以手指在螢幕上與離開後 0.5 秒內，每個 frame 主動讀一次
  */
 export function useHudViewport(): void {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const vv = window.visualViewport;
     let touching = false;
     let until = 0;

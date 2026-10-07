@@ -5,6 +5,7 @@ import type { Folder, Notebook } from '../db/schema';
 import { actions, type LibraryContext } from './actions';
 import { daysSince, getLastBackupAt, needsBackupReminder, runBackup } from './backupActions';
 import { ItemDialog, ItemMenu, type Item, type ItemAction } from './ItemDialogs';
+import { NOTEBOOKS_CHANGED } from '../tabs';
 
 interface Props {
   db: InkDatabase;
@@ -42,7 +43,11 @@ export function Library({ db, onOpen }: Props) {
 
   const refresh = () => {
     void getLastBackupAt(db).then(setLastBackupAt);
-    void listNotebooks(db).then((nbs) => setNotebooks(nbs.sort((a, b) => b.updatedAt - a.updatedAt)));
+    void listNotebooks(db).then((nbs) => {
+      setNotebooks(nbs.sort((a, b) => b.updatedAt - a.updatedAt));
+      // 分頁列更新標題、拿掉已刪除的筆記本
+      window.dispatchEvent(new Event(NOTEBOOKS_CHANGED));
+    });
     void listFolders(db).then((fs) => {
       setFolders(fs.sort((a, b) => a.createdAt - b.createdAt));
       // 目前的資料夾被刪除（或還原後不存在）時回到根目錄

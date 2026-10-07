@@ -52,7 +52,8 @@ test('大選單開關：收起時是 ▼，展開時是 ▲', async ({ page }) =
 
 test('快捷列在頂端固定區域裡，白紙從它下面開始；大選單從它下方展開', async ({ page }) => {
   const band = await bottomOf(page, '.top-band');
-  expect(await topOf(page, '.quickbar')).toBeLessThan(20);
+  const barTop = await topOf(page, '.quickbar');
+  expect(await bottomOf(page, '.quickbar')).toBeLessThanOrEqual(band); // 快捷列在固定區域裡
   // 白紙不被頂端固定區域蓋住
   expect(await topOf(page, '.page[data-index="0"]')).toBeGreaterThanOrEqual(band);
   expect(await pageInView(page)).toBe(true);
@@ -60,7 +61,7 @@ test('快捷列在頂端固定區域裡，白紙從它下面開始；大選單�
   await toggle(page, '展開選單').click();
   await expect(menu(page)).toBeVisible();
   // 快捷列不動；頂端列＋工具列接在固定區域下方
-  expect(await topOf(page, '.quickbar')).toBeLessThan(20);
+  expect(await topOf(page, '.quickbar')).toBe(barTop);
   await expect.poll(() => topOf(page, '.topbar')).toBeCloseTo(band, 0);
   await expect.poll(() => topOf(page, '.toolbar')).toBeCloseTo(await bottomOf(page, '.topbar'), 0);
 
@@ -84,6 +85,13 @@ test('展開或收起大選單不改變頁面大小與位置', async ({ page }) 
   expect(await box()).toEqual(before);
   await toggle(page, '收起選單').click();
   expect(await box()).toEqual(before);
+});
+
+test('從大選單回到書架：書架一出現，編輯頁的版面就已經拿掉（不會閃一下）', async ({ page }) => {
+  await toggle(page, '展開選單').click();
+  await page.getByRole('button', { name: '‹ 書架' }).click();
+  await page.getByRole('button', { name: '新增筆記本' }).waitFor();
+  expect(await page.evaluate(() => document.documentElement.hasAttribute('data-chrome'))).toBe(false);
 });
 
 test('大選單收起時回到書架，頂端列正常顯示', async ({ page }) => {
