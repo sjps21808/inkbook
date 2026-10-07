@@ -1,11 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { InkDatabase } from '../db/db';
 import { listElements } from '../db/repo';
 import { PAGE_HEIGHT, PAGE_WIDTH, type Page, type PageElement } from '../db/schema';
 import type { PdfDocs } from '../pdf/render';
 import type { ImageCache } from './images';
-import { toHudY } from './hud';
-import { safeTop } from './PageList';
 import { renderInk } from './stroke';
 import { drawText } from './text';
 import { drawTemplate } from './templates';
@@ -70,7 +68,6 @@ export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, o
   const visible = useRef(new Set<string>());
   const queue = useRef(Promise.resolve());
   const [, force] = useState(0);
-  const [top, setTop] = useState(0);
   const [drag, setDrag] = useState<{ from: number; to: number; dy: number } | null>(null);
   const latest = useRef({ pages, elementsOf, versions });
   latest.current = { pages, elementsOf, versions };
@@ -95,21 +92,6 @@ export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, o
         force((n) => n + 1);
       });
   };
-
-  // 側欄貼在大選單＋浮動列（.menu-stack）下方；大選單展開／收起時容器高度一定會變，ResizeObserver 會通知
-  useLayoutEffect(() => {
-    const stack = document.querySelector('.menu-stack');
-    const place = () =>
-      setTop(Math.max(stack ? toHudY(stack, stack.getBoundingClientRect().bottom) + 8 : 0, safeTop()));
-    place();
-    const ro = new ResizeObserver(place);
-    if (stack) ro.observe(stack);
-    window.addEventListener('resize', place);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', place);
-    };
-  }, []);
 
   // 捲入可見範圍才產生縮圖
   useEffect(() => {
@@ -179,7 +161,7 @@ export function Thumbnails({ db, images, pages, elementsOf, versions, pdfDocs, o
   };
 
   return (
-    <aside class="thumbnails" ref={listRef} style={{ top: px(top) }} aria-label="頁面縮圖">
+    <aside class="thumbnails" ref={listRef} aria-label="頁面縮圖">
       {pages.map((p, i) => (
         <div
           key={p.id}

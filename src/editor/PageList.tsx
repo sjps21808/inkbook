@@ -42,6 +42,8 @@ interface Props {
   pdfDocs: PdfDocs;
   /** 在最後一頁再往後翻 */
   onFlipPastEnd(): void;
+  /** 頂端固定區域（分頁列＋快捷列，含狀態列）的高度 */
+  topInset: number;
   /** 第一次顯示的頁面 index */
   initialIndex: number;
   /** 目前頁改變（含第一次顯示） */
@@ -54,17 +56,11 @@ const NONE: string[] = [];
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** 頁寬：不超過容器寬度與上限，且整頁（含上下間距、頂端安全區）放得進螢幕高度 */
-export function fitPageWidth(containerW: number, viewportH: number, safeTop: number): number {
-  const byHeight = ((viewportH - safeTop - 2 * GAP) * PAGE_WIDTH) / PAGE_HEIGHT;
+/** 頁寬：不超過容器寬度與上限，且整頁（含上下間距）放得進頂端固定區域（含狀態列）以下的高度 */
+export function fitPageWidth(containerW: number, viewportH: number, topInset: number): number {
+  const byHeight = ((viewportH - topInset - 2 * GAP) * PAGE_WIDTH) / PAGE_HEIGHT;
   return Math.max(0, Math.min(containerW, MAX_PAGE_WIDTH, byHeight));
 }
-
-/** 頂端安全區（狀態列）高度：.topbar 的 padding-top = env(safe-area-inset-top) */
-export const safeTop = () => {
-  const el = document.querySelector('.topbar');
-  return el ? parseFloat(getComputedStyle(el).paddingTop) || 0 : 0;
-};
 
 /**
  * 手指滑動 → 翻頁方向：往左滑 = 下一頁（+1）、往右滑 = 上一頁（-1）、不算滑動 = 0。
@@ -110,14 +106,15 @@ export function PageList(props: Props) {
     onPageChange,
     initialIndex,
     onFlipPastEnd,
+    topInset,
   } = props;
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
-  // 版面視窗高度（clientHeight 不受雙指縮放影響）與頂端安全區
-  const [viewport, setViewport] = useState({ h: 0, safe: 0 });
+  // 版面視窗高度（clientHeight 不受雙指縮放影響）
+  const [viewportH, setViewportH] = useState(0);
   const [current, setCurrent] = useState(initialIndex);
   const trackRef = useRef<HTMLDivElement>(null);
-  const pageW = fitPageWidth(width, viewport.h, viewport.safe);
+  const pageW = fitPageWidth(width, viewportH, topInset);
   const pageH = (pageW * PAGE_HEIGHT) / PAGE_WIDTH;
   // 相鄰頁相隔一個容器寬度，翻頁時旁邊的頁不會露出來
   const strideX = width + GAP;
@@ -129,11 +126,7 @@ export function PageList(props: Props) {
     const ro = new ResizeObserver(() => setWidth(el.clientWidth));
     ro.observe(el);
     setWidth(el.clientWidth);
-    const onResize = () => {
-      const h = document.documentElement.clientHeight;
-      const safe = safeTop();
-      setViewport((v) => (v.h === h && v.safe === safe ? v : { h, safe }));
-    };
+    const onResize = () => setViewportH(document.documentElement.clientHeight);
     onResize();
     window.addEventListener('resize', onResize);
     return () => {

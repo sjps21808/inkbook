@@ -240,32 +240,39 @@ html[data-chrome] .topbar {
   right: 0;
 }
 
-/* 大選單與浮動列上下排在同一個容器：浮動列自然貼在大選單下方；大選單收起時容器移到頂端 */
-.menu-stack {
+/* 頂端固定區域（分頁列＋快捷列）：白紙從它下面開始，不被蓋住；高度由 Editor 量好寫進 --band-h */
+.top-band {
   position: fixed;
-  top: calc(52px + env(safe-area-inset-top));
+  top: 0;
   left: 0;
   right: 0;
+  z-index: 30; /* 高於大選單：快捷列跳出的色盤、模式選單蓋在大選單上面 */
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  pointer-events: none;
+  gap: 6px;
+  padding: calc(6px + env(safe-area-inset-top)) 8px 6px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 
-html[data-chrome="collapsed"] .menu-stack {
-  top: calc(8px + env(safe-area-inset-top));
+/* 大選單（頂端列＋工具列）從頂端固定區域下方展開，蓋在白紙上 */
+html[data-chrome] .topbar {
+  top: var(--band-h, 0px);
+  padding-top: 0;
 }
 
-.menu-stack > * {
-  pointer-events: auto;
+.menu-drop {
+  position: fixed;
+  top: calc(var(--band-h, 0px) + 53px); /* 頂端列高 52px + 下框線 1px */
+  left: 0;
+  right: 0;
+  z-index: 25;
 }
 
 html[data-chrome] .toolbar {
   position: relative;
-  z-index: 25; /* 高於浮動列：大選單的彈出選單（新增頁面的模板等）不會被浮動列蓋住 */
   top: auto;
-  align-self: stretch;
   margin: 0;
 }
 
@@ -276,7 +283,11 @@ html[data-chrome] body {
 }
 
 html[data-chrome] .editor {
-  padding-top: calc(16px + env(safe-area-inset-top));
+  padding-top: calc(var(--band-h, 0px) + 16px);
+}
+
+html[data-chrome] .thumbnails {
+  top: calc(var(--band-h, 0px) + 8px);
 }
 
 html[data-chrome="collapsed"] .topbar,
@@ -284,7 +295,7 @@ html[data-chrome="collapsed"] .toolbar {
   display: none;
 }
 
-/* 浮動快捷列：上方中央的圓角膠囊（位置由 .menu-stack 決定） */
+/* 快捷列：頂端固定區域裡置中的圓角膠囊 */
 .quickbar {
   position: relative;
   z-index: 20;

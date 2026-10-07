@@ -65,9 +65,9 @@ test('放大時打開的色盤、縮圖側欄、對話框也維持原本大小',
 
   await page.getByRole('button', { name: '頁面', exact: true }).click();
   expect((await rect(page, '.thumbnails')).w).toBeCloseTo(sidebarW / 2, 0);
-  // 側欄貼在浮動列下方（同一個縮放座標）
-  const bar = await rect(page, '.quickbar');
-  expect((await rect(page, '.thumbnails')).y).toBeCloseTo(bar.y + bar.h + 8 / 2, 0);
+  // 側欄貼在頂端固定區域下方（同一個縮放座標）
+  const band = await rect(page, '.top-band');
+  expect((await rect(page, '.thumbnails')).y).toBeCloseTo(band.y + band.h + 8 / 2, 0);
 
   await page.getByRole('button', { name: '匯出 PDF', exact: true }).click();
   const dialog = page.locator('.dialog');

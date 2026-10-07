@@ -60,10 +60,3 @@ export function useHudViewport(): void {
     };
   }, []);
 }
-
-/** 畫面上的 y（getBoundingClientRect）換成 el 所在 .hud 內的座標（放大時 .hud 縮小了 1/倍率） */
-export function toHudY(el: Element, y: number): number {
-  const hud = el.closest('.hud');
-  if (!hud) return y;
-  return (y - hud.getBoundingClientRect().top) * (window.visualViewport?.scale || 1);
-}

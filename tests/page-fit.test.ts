@@ -17,7 +17,7 @@ describe('頁面大小', () => {
     expect(w).toBeLessThan(1148);
   });
 
-  it('扣掉頂端安全區', () => {
+  it('扣掉頂端固定區域（含狀態列）', () => {
     expect(heightOf(fitPageWidth(1148, 820, 24))).toBeCloseTo(820 - 24 - 32);
   });
 

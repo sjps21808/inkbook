@@ -50,19 +50,27 @@ test('大選單開關：收起時是 ▼，展開時是 ▲', async ({ page }) =
   await expect.poll(dir).toBe('down');
 });
 
-test('浮動列：大選單展開時貼在它下方，收起時移到頂端', async ({ page }) => {
+test('快捷列在頂端固定區域裡，白紙從它下面開始；大選單從它下方展開', async ({ page }) => {
+  const band = await bottomOf(page, '.top-band');
   expect(await topOf(page, '.quickbar')).toBeLessThan(20);
+  // 白紙不被頂端固定區域蓋住
+  expect(await topOf(page, '.page[data-index="0"]')).toBeGreaterThanOrEqual(band);
+  expect(await pageInView(page)).toBe(true);
+
   await toggle(page, '展開選單').click();
   await expect(menu(page)).toBeVisible();
-  await expect.poll(() => topOf(page, '.quickbar')).toBeCloseTo((await bottomOf(page, '.toolbar')) + 8, 0);
-  // 大選單展開狀態下重新整理：浮動列仍在大選單下方，不會被蓋住
+  // 快捷列不動；頂端列＋工具列接在固定區域下方
+  expect(await topOf(page, '.quickbar')).toBeLessThan(20);
+  await expect.poll(() => topOf(page, '.topbar')).toBeCloseTo(band, 0);
+  await expect.poll(() => topOf(page, '.toolbar')).toBeCloseTo(await bottomOf(page, '.topbar'), 0);
+
+  // 大選單展開狀態下重新整理：位置一樣，快捷列點得到
   await page.reload();
   await waitReady(page);
   await expect(menu(page)).toBeVisible();
-  await expect.poll(() => topOf(page, '.quickbar')).toBeCloseTo((await bottomOf(page, '.toolbar')) + 8, 0);
+  await expect.poll(() => topOf(page, '.topbar')).toBeCloseTo(band, 0);
   await quick(page).getByRole('button', { name: '粗' }).click();
-  await toggle(page, '收起選單').click();
-  await expect.poll(() => topOf(page, '.quickbar')).toBeLessThan(20);
+  await expect(quick(page).getByRole('button', { name: '粗' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('展開或收起大選單不改變頁面大小與位置', async ({ page }) => {

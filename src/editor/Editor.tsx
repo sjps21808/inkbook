@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { InkDatabase } from '../db/db';
 import {
   addPage,
@@ -53,6 +53,9 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const [initialIndex] = useState(() => loadLastPage(notebook.id, initialPages));
   const [current, setCurrent] = useState(initialIndex);
+  // 頂端固定區域的高度：頁面從它下面開始（--band-h 給 CSS 用：編輯區上邊距、大選單、縮圖側欄的位置）
+  const bandRef = useRef<HTMLDivElement>(null);
+  const [bandH, setBandH] = useState(0);
   const cacheRef = useRef<Cache>(cache);
   const loading = useRef(new Set<string>());
   const listRef = useRef<PageListHandle>(null);
@@ -288,6 +291,23 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
 
   useHudViewport();
 
+  useLayoutEffect(() => {
+    const band = bandRef.current!;
+    const root = document.documentElement.style;
+    // 精確高度（可能有小數；不受放大時 .hud 縮放影響）
+    const update = (h: number) => {
+      root.setProperty('--band-h', `${h}px`);
+      setBandH(h);
+    };
+    update(band.offsetHeight);
+    const ro = new ResizeObserver(([e]) => update(e.borderBoxSize?.[0]?.blockSize ?? band.offsetHeight));
+    ro.observe(band);
+    return () => {
+      ro.disconnect();
+      root.removeProperty('--band-h');
+    };
+  }, []);
+
   const toggleChrome = () => {
     saveCollapsed(!collapsed);
     setCollapsed(!collapsed);
@@ -299,7 +319,24 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     <div class="editor">
       {/* 浮在頁面上的介面：放大時反向縮放，維持原本大小（見 hud.ts） */}
       <div class="hud">
-        <div class="menu-stack">
+        {/* 頂端固定區域：不蓋住白紙 */}
+        <div class="top-band" ref={bandRef}>
+          <QuickBar
+            state={toolState}
+            onChange={onToolChange}
+            canUndo={history.canUndo}
+            canRedo={history.canRedo}
+            onUndo={() => run(() => history.undo())}
+            onRedo={() => run(() => history.redo())}
+            menuOpen={!collapsed}
+            onToggleMenu={toggleChrome}
+            hasSelection={!!selection && selection.ids.length > 0}
+            onDuplicate={duplicateSelection}
+            onDeleteSelection={deleteSelection}
+          />
+        </div>
+        {/* 大選單：從頂端固定區域下方展開，蓋在白紙上 */}
+        <div class="menu-drop">
           <Toolbar title={notebook.title} onBack={onBack} state={toolState} onChange={onToolChange} onAction={onAction}>
             <div class="group page-nav" aria-label="翻頁">
               <button
@@ -344,19 +381,6 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
               onDelete={(index) => execute(deletePageCommand(pages[index], index))}
             />
           </Toolbar>
-          <QuickBar
-            state={toolState}
-            onChange={onToolChange}
-            canUndo={history.canUndo}
-            canRedo={history.canRedo}
-            onUndo={() => run(() => history.undo())}
-            onRedo={() => run(() => history.redo())}
-            menuOpen={!collapsed}
-            onToggleMenu={toggleChrome}
-            hasSelection={!!selection && selection.ids.length > 0}
-            onDuplicate={duplicateSelection}
-            onDeleteSelection={deleteSelection}
-          />
         </div>
         {showThumbs && (
           <Thumbnails
@@ -387,6 +411,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
         pdfDocs={pdfDocs}
         onPageChange={setCurrent}
         onFlipPastEnd={addPageAtEnd}
+        topInset={bandH}
         initialIndex={initialIndex}
       />
     </div>
