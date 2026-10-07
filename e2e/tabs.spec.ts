@@ -87,3 +87,44 @@ test('分頁太多時可以左右捲動，目前分頁在看得到的位置', as
   }));
   expect(top.page).toBeGreaterThanOrEqual(top.band);
 });
+
+/** 在分頁 from 上按住 holdMs 後拖到分頁 to 的右半邊放開（合成 touch pointer 事件） */
+const dragTab = (page: Page, from: string, to: string, holdMs: number) =>
+  page.evaluate(
+    async ({ from, to, holdMs }) => {
+      const find = (t: string) =>
+        [...document.querySelectorAll<HTMLElement>('.top-band .tab')].find((e) => e.textContent!.includes(t))!;
+      const src = find(from);
+      const a = src.getBoundingClientRect();
+      const b = find(to).getBoundingClientRect();
+      const fire = (type: string, x: number) =>
+        src.querySelector('.tab-title')!.dispatchEvent(
+          new PointerEvent(type, { pointerType: 'touch', pointerId: 21, clientX: x, clientY: a.top + a.height / 2, bubbles: true }),
+        );
+      fire('pointerdown', a.left + 20);
+      await new Promise((r) => setTimeout(r, holdMs));
+      for (let i = 1; i <= 5; i++) fire('pointermove', a.left + 20 + ((b.right - 10 - a.left - 20) * i) / 5);
+      fire('pointerup', b.right - 10);
+      src.querySelector<HTMLElement>('.tab-title')!.click(); // 放開後的點擊：拖曳時不應切換分頁
+    },
+    { from, to, holdMs },
+  );
+
+test('長按拖曳分頁排序，順序會記住；沒按住就拖不會排序', async ({ page }) => {
+  for (const t of ['一', '二', '三']) await openNewNotebook(page, t);
+  await expect(tabTitles(page)).toHaveText(['一', '二', '三']);
+
+  // 沒按住（馬上拖）= 捲動分頁列，不排序
+  await dragTab(page, '一', '三', 0);
+  await expect(tabTitles(page)).toHaveText(['一', '二', '三']);
+  await waitReady(page);
+
+  await tab(page, '三').locator('.tab-title').click();
+  await waitReady(page);
+  await dragTab(page, '一', '三', 500);
+  await expect(tabTitles(page)).toHaveText(['二', '三', '一']);
+  await expect(activeTitle(page)).toHaveText('三'); // 拖曳放開不會切到被拖的分頁
+  await page.reload();
+  await waitReady(page);
+  await expect(tabTitles(page)).toHaveText(['二', '三', '一']);
+});

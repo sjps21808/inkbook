@@ -7,7 +7,7 @@ import { Library } from './library/Library';
 import { UpdatePrompt } from './pwa/UpdatePrompt';
 import { notebookHash, useRoute } from './router';
 import { TabBar } from './TabBar';
-import { closeTab, loadTabs, openTab, pruneTabs, saveTabs } from './tabs';
+import { closeTab, loadTabs, moveTab, openTab, pruneTabs, saveTabs } from './tabs';
 import { ThemeSelect } from './ThemeSelect';
 
 function NotebookView({ db, id, tabBar }: { db: InkDatabase; id: string; tabBar: VNode }) {
@@ -66,6 +66,7 @@ export function App() {
         if (next !== active) goTo(next);
       }}
       onMissing={(ids) => setTabs((t) => pruneTabs(t, (id) => !ids.includes(id)))}
+      onReorder={(from, to) => setTabs((t) => moveTab(t, from, to))}
     />
   ) : null;
 
