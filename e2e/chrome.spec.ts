@@ -41,6 +41,15 @@ test('預設收起：只有浮動列；展開後大選單出現，重新整理�
   await expect(quick(page)).toBeVisible();
 });
 
+test('大選單開關：收起時是 ▼，展開時是 ▲', async ({ page }) => {
+  const dir = () => page.locator('.menu-toggle path').getAttribute('data-dir');
+  expect(await dir()).toBe('down');
+  await toggle(page, '展開選單').click();
+  await expect.poll(dir).toBe('up');
+  await toggle(page, '收起選單').click();
+  await expect.poll(dir).toBe('down');
+});
+
 test('浮動列：大選單展開時貼在它下方，收起時移到頂端', async ({ page }) => {
   expect(await topOf(page, '.quickbar')).toBeLessThan(20);
   await toggle(page, '展開選單').click();

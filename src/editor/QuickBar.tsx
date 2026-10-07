@@ -7,7 +7,7 @@ import {
   EraserIcon,
   HighlighterIcon,
   LassoIcon,
-  MenuIcon,
+  MenuToggleIcon,
   PenIcon,
   RedoIcon,
   TrashIcon,
@@ -98,7 +98,7 @@ export function QuickBar(props: Props) {
         aria-expanded={menuOpen}
         onClick={onToggleMenu}
       >
-        <MenuIcon />
+        <MenuToggleIcon open={menuOpen} />
       </button>
       <span class="sep" />
       {QUICK_TOOLS.map((id) => (

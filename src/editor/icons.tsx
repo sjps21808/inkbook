@@ -17,9 +17,15 @@ const Icon = ({ children }: { children: ComponentChildren }) => (
   </svg>
 );
 
-export const MenuIcon = () => (
+/** 大選單開關：收起時 ▼（往下拉出）、展開時 ▲（往上收回），實心三角形 */
+export const MenuToggleIcon = ({ open }: { open: boolean }) => (
   <Icon>
-    <path d="M4 7h16M4 12h16M4 17h16" />
+    <path
+      data-dir={open ? 'up' : 'down'}
+      d={open ? 'M6 15l6-7 6 7z' : 'M6 9l6 7 6-7z'}
+      fill="currentColor"
+      stroke-width="1"
+    />
   </Icon>
 );
 
