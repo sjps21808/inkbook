@@ -25,7 +25,7 @@ export const tools: ToolDef[] = [
   { id: 'highlighter', label: '螢光筆', stroke: 'highlighter', widths: [8, 14, 20] },
   // widths = 橡皮擦半徑
   { id: 'eraser', label: '橡皮擦', stroke: 'pen', widths: [6, 10, 30], pointer: eraserSession, options: [{ id: 'partial', label: '局部' }, { id: 'whole', label: '整筆' }] },
-  { id: 'lasso', label: '套索', stroke: 'pen', widths: [1, 1, 1], pointer: lassoSession },
+  { id: 'lasso', label: '套索', stroke: 'pen', widths: [1, 1, 1], pointer: lassoSession, options: [{ id: 'free', label: '自由' }, { id: 'rect', label: '矩形' }] },
   { id: 'image', label: '圖片', stroke: 'pen', widths: [1, 1, 1], action: pickImage },
   // widths = 字級（pt）
   { id: 'text', label: '文字', stroke: 'pen', widths: [12, 16, 24], pointer: textSession },

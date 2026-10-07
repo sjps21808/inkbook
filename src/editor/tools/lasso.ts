@@ -35,7 +35,12 @@ function transformSession(ctx: ToolContext, make: (p: Point) => Transform | null
   };
 }
 
-/** 套索：在選取框內拖曳 = 移動，拖右下角把手 = 等比縮放，其他地方 = 重新圈選 */
+/** 矩形套索：對角兩點 a、b 圍成的矩形（四個角的多邊形，判斷規則與自由套索相同） */
+export function rectPolygon(a: Point, b: Point): number[] {
+  return [a.x, a.y, b.x, a.y, b.x, b.y, a.x, b.y];
+}
+
+/** 套索：在選取框內拖曳 = 移動，拖右下角把手 = 等比縮放，其他地方 = 重新圈選（自由或矩形） */
 export function lassoSession(ctx: ToolContext, at: Point): ToolSession {
   const box = selectionBounds(ctx.elements, ctx.selection);
   if (box) {
@@ -61,7 +66,8 @@ export function lassoSession(ctx: ToolContext, at: Point): ToolSession {
     }
   }
 
-  const poly = [at.x, at.y];
+  const rect = ctx.option === 'rect';
+  let poly = rect ? rectPolygon(at, at) : [at.x, at.y];
   const draw = () =>
     ctx.drawLive((c) => {
       c.beginPath();
@@ -77,13 +83,17 @@ export function lassoSession(ctx: ToolContext, at: Point): ToolSession {
   draw();
   return {
     move(p) {
-      poly.push(p.x, p.y);
+      if (rect) poly = rectPolygon(at, p);
+      else poly.push(p.x, p.y);
       draw();
     },
     up(p) {
-      poly.push(p.x, p.y);
+      if (rect) poly = rectPolygon(at, p);
+      else poly.push(p.x, p.y);
       ctx.drawLive(null);
-      ctx.select(poly.length >= 6 ? ctx.elements.filter((e) => lassoHit(e, poly)).map((e) => e.id) : []);
+      // 自由：至少三個點；矩形：寬高都不能是 0
+      const ok = rect ? p.x !== at.x && p.y !== at.y : poly.length >= 6;
+      ctx.select(ok ? ctx.elements.filter((e) => lassoHit(e, poly)).map((e) => e.id) : []);
     },
   };
 }

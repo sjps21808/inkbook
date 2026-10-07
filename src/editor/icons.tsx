@@ -57,6 +57,13 @@ export const LassoIcon = () => (
   </Icon>
 );
 
+export const RectLassoIcon = () => (
+  <Icon>
+    <rect x="4" y="5" width="16" height="12" rx="1" stroke-dasharray="2.5 2.5" />
+    <path d="M7 17c-1 2 0 3.5 2 4" />
+  </Icon>
+);
+
 /** 粗細：一條橫線，線寬依段數 */
 export const WidthIcon = ({ width }: { width: number }) => (
   <Icon>

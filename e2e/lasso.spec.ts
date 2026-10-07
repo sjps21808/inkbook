@@ -98,3 +98,24 @@ test('複製選取：多一筆，且選取移到複本', async ({ page }) => {
   // 刪掉的是複本，原本那一筆還在
   expect((await inkPixel(page, [0.5, 0.3]))[3]).toBe(255);
 });
+
+test('矩形模式：再點一次套索選「矩形」，對角拖曳圈選；圖示變成方框', async ({ page }) => {
+  // beforeEach 已用自由套索選了第一條線；套索已選中，再點一次跳出模式選單
+  await button(page, '套索').click();
+  await expect(button(page, '自由')).toHaveAttribute('aria-pressed', 'true');
+  await button(page, '矩形').click();
+  await expect(page.getByRole('group', { name: '套索模式' })).toHaveCount(0);
+  await expect(page.locator('.quickbar button[aria-label="套索"] svg rect')).toHaveCount(1);
+
+  // 只拖兩個角（中間一點），圈住 y = 0.6 那條線
+  await drawStroke(page, [
+    [0.1, 0.55],
+    [0.5, 0.6],
+    [0.9, 0.65],
+  ]);
+  await expect(page.locator('.selection')).toBeVisible();
+  await button(page, '刪除選取').click();
+  await expect.poll(() => elementCount(page)).toBe(1);
+  expect((await inkPixel(page, [0.5, 0.3]))[3]).toBe(255); // 另一條線還在
+  await expect.poll(async () => (await inkPixel(page, [0.5, 0.6]))[3]).toBe(0);
+});

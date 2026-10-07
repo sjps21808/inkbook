@@ -9,6 +9,7 @@ import {
   LassoIcon,
   MenuToggleIcon,
   PenIcon,
+  RectLassoIcon,
   RedoIcon,
   TrashIcon,
   UndoIcon,
@@ -49,7 +50,8 @@ function ToolButton({ id, state, onChange }: { id: string; state: ToolState; onC
   const ref = useRef<HTMLSpanElement>(null);
   useDismiss(ref, open, () => setOpen(false));
   const t = tools.find((x) => x.id === id)!;
-  const ToolIcon = TOOL_ICONS[id];
+  // 套索的圖示隨模式變（自由 = 虛線圈、矩形 = 虛線方框）
+  const ToolIcon = id === 'lasso' && toolOption(state, t) === 'rect' ? RectLassoIcon : TOOL_ICONS[id];
   const active = state.toolId === id;
   return (
     <span class="tool-button" ref={ref}>
