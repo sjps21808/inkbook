@@ -86,3 +86,36 @@ test('回到書架：頂端列不受縮放影響', async ({ page }) => {
     .poll(() => page.evaluate(() => getComputedStyle(document.querySelector('.app-hud')!).transform))
     .toBe('none');
 });
+
+/** 只改 visualViewport 的數值、不送事件（模擬快速縮放時 Safari 漏送事件） */
+const silentZoom = (page: Page, scale: number, x: number, y: number) =>
+  page.evaluate(
+    ({ scale, x, y }) => {
+      const vv = window.visualViewport!;
+      Object.defineProperty(vv, 'scale', { configurable: true, get: () => scale });
+      Object.defineProperty(vv, 'offsetLeft', { configurable: true, get: () => x });
+      Object.defineProperty(vv, 'offsetTop', { configurable: true, get: () => y });
+    },
+    { scale, x, y },
+  );
+const hudTransform = (page: Page) =>
+  page.evaluate(() => getComputedStyle(document.querySelector('.app-hud')!).transform);
+const touch = (page: Page, type: 'touchstart' | 'touchend') =>
+  page.evaluate((type) => window.dispatchEvent(new TouchEvent(type, { bubbles: true })), type);
+
+test('縮放事件漏送：手指在螢幕上時仍會逐 frame 同步，放開 0.5 秒後停止', async ({ page }) => {
+  await touch(page, 'touchstart');
+  await silentZoom(page, 2, 30, 40);
+  await expect.poll(() => hudTransform(page)).toBe('matrix(0.5, 0, 0, 0.5, 30, 40)');
+
+  // 放開後 0.5 秒內最後的變化也會同步
+  await touch(page, 'touchend');
+  await silentZoom(page, 1.5, 10, 20);
+  await expect.poll(() => hudTransform(page), { timeout: 400 }).toMatch(/^matrix\(0\.666/);
+
+  // 停止後不再輪詢（沒有手指、沒有事件就不會變）
+  await page.waitForTimeout(700);
+  await silentZoom(page, 3, 0, 0);
+  await page.waitForTimeout(200);
+  expect(await hudTransform(page)).toMatch(/^matrix\(0\.666/);
+});
