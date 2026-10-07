@@ -48,6 +48,8 @@ interface Props {
   /** 這一頁選取中的 element id */
   selection: string[];
   onSelect(ids: string[]): void;
+  /** 白紙縮放倍率（手勢結束後才更新）：依顯示大小重設 canvas 解析度，放大後畫面清晰 */
+  zoom: number;
 }
 
 /** Safari 專有：Apple Pencil 的 touch 為 'stylus' */
@@ -98,7 +100,11 @@ export function PageCanvas(props: Props) {
     }
   };
 
-  // 依顯示大小調整 canvas 解析度；卸載時釋放 canvas 記憶體
+  // 依顯示大小（含白紙縮放）調整 canvas 解析度；卸載時釋放 canvas 記憶體
+  const resizeRef = useRef<() => void>(() => {});
+  const zoomRef = useRef(props.zoom);
+  zoomRef.current = props.zoom;
+  useEffect(() => resizeRef.current(), [props.zoom]);
   useLayoutEffect(() => {
     const page = pageRef.current!;
     const bg = bgRef.current!;
@@ -112,7 +118,8 @@ export function PageCanvas(props: Props) {
       if (pdf) bgJob = pdfDocs.render(bg, pdf, scaleRef.current);
     };
     const resize = () => {
-      const rect = page.getBoundingClientRect();
+      // 版面大小（不受 transform 影響）× 白紙縮放倍率：不會讀到縮放動畫進行中的大小
+      const rect = { width: page.offsetWidth * zoomRef.current, height: page.offsetHeight * zoomRef.current };
       if (!rect.width) return;
       const dpr = window.devicePixelRatio || 1;
       const k = Math.min(dpr, MAX_CANVAS_PX / rect.height);
@@ -130,6 +137,7 @@ export function PageCanvas(props: Props) {
     };
     // canvas 預設 300×150；live 等到書寫時才配置
     if (activeLive !== live) release(live);
+    resizeRef.current = resize;
     const ro = new ResizeObserver(resize);
     ro.observe(page);
     resize();

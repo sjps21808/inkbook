@@ -340,7 +340,7 @@ test('翻頁動畫還沒播完就再拖：頁面從看得到的位置接著動�
   await expect.poll(() => pageLeft(page, 2)).toBeCloseTo(r!.centered, 0);
 });
 
-test('沒放大時單指上下滑不會捲動頁面（擋掉 touchmove）；雙指與放大時照常交給瀏覽器', async ({ page }) => {
+test('頁面上的單指、雙指 touchmove 都擋掉原生捲動與縮放（全部由 App 處理）', async ({ page }) => {
   const prevented = (touches: number) =>
     page.evaluate((touches) => {
       const target = document.querySelector('.page[data-index="0"] .overlay')!;
@@ -350,11 +350,5 @@ test('沒放大時單指上下滑不會捲動頁面（擋掉 touchmove）；雙�
       return e.defaultPrevented;
     }, touches);
   expect(await prevented(1)).toBe(true);
-  expect(await prevented(2)).toBe(false);
-
-  // 放大中：單指要能原生平移
-  await page.evaluate(() =>
-    Object.defineProperty(window.visualViewport!, 'scale', { configurable: true, get: () => 2 }),
-  );
-  expect(await prevented(1)).toBe(false);
+  expect(await prevented(2)).toBe(true);
 });

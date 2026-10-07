@@ -18,6 +18,11 @@ const DRAG_RATIO = 0.35;
 const ADD_PAGE_RATIO = 0.35;
 /** 拖動超過這個距離才決定是左右拖（之前不動，避免點一下就晃） */
 const DRAG_LOCK = 8;
+/** 白紙縮放範圍；縮放中可以暫時縮到 MIN_PINCH（放開後彈回 1x） */
+export const MAX_ZOOM = 4;
+const MIN_PINCH = 0.8;
+/** 放開後彈回範圍內的動畫長度（與 app.css .page-slot.zoom-anim 一致） */
+const ZOOM_ANIM_MS = 200;
 
 export interface PageListHandle {
   /** 翻到 pageId；找不到時翻到 fallbackIndex */
@@ -85,8 +90,16 @@ export function addPageArmed(dx: number, dy: number, pageW: number): boolean {
   return -dx >= pageW * ADD_PAGE_RATIO && Math.abs(dx) > Math.abs(dy);
 }
 
-/** 雙指放大中（放大時單指拖動是原生平移，不翻頁） */
-const zoomed = () => (window.visualViewport?.scale ?? 1) > 1.01;
+/**
+ * 平移限制（單一軸）：白紙起點 start、長度 size，看得到的範圍 [lo, hi]。
+ * 白紙比範圍大：邊緣不能被拖進範圍內；比範圍小：整張留在範圍內
+ */
+export function clampPan(start: number, size: number, lo: number, hi: number): number {
+  return size <= hi - lo ? clamp(start, lo, hi - size) : clamp(start, hi - size, lo);
+}
+
+type Zoom = { s: number; x: number; y: number };
+const NO_ZOOM: Zoom = { s: 1, x: 0, y: 0 };
 
 export function PageList(props: Props) {
   const {
@@ -135,31 +148,40 @@ export function PageList(props: Props) {
     };
   }, []);
 
-  // 放大時讓單指恢復原生平移（touch-action 見 app.css）
-  useEffect(() => {
-    const vv = window.visualViewport;
-    const root = document.documentElement;
-    const update = () => {
-      if (zoomed()) root.dataset.zoomed = '';
-      else root.removeAttribute('data-zoomed');
-    };
-    update();
-    vv?.addEventListener('resize', update);
-    return () => {
-      vv?.removeEventListener('resize', update);
-      root.removeAttribute('data-zoomed');
-    };
-  }, []);
-
-  // 沒放大時擋掉單指的原生捲動與回彈：頁面只會左右跟手，上下固定（雙指縮放、放大後的平移照常）
+  // 頁面上的手勢全部自己處理：擋掉原生捲動、回彈與 Safari 的整頁縮放（只縮放白紙，選單不動）
   useEffect(() => {
     const el = ref.current!;
     const lock = (e: TouchEvent) => {
-      if (e.touches.length <= 1 && !zoomed()) e.preventDefault();
+      if (e.cancelable) e.preventDefault();
     };
+    const noGesture = (e: Event) => e.preventDefault();
     el.addEventListener('touchmove', lock, { passive: false });
-    return () => el.removeEventListener('touchmove', lock);
+    document.addEventListener('gesturestart', noGesture);
+    document.addEventListener('gesturechange', noGesture);
+    return () => {
+      el.removeEventListener('touchmove', lock);
+      document.removeEventListener('gesturestart', noGesture);
+      document.removeEventListener('gesturechange', noGesture);
+    };
   }, []);
+
+  // 白紙縮放（只套在目前這一頁的 .page-slot）。手勢中直接改 DOM，結束後才更新 zoom（讓 PageCanvas 依倍率重繪）
+  const zoomRef = useRef<Zoom>(NO_ZOOM);
+  const [zoom, setZoom] = useState(1);
+  const slotOf = (i: number) => ref.current?.querySelector<HTMLElement>(`.page-slot[data-slot="${i}"]`) ?? null;
+  const applyZoom = (z: Zoom, anim = false) => {
+    zoomRef.current = z;
+    const slot = slotOf(latest.current.cur);
+    if (!slot) return;
+    slot.classList.toggle('zoom-anim', anim);
+    slot.style.transform = z.s === 1 && !z.x && !z.y ? '' : `translate(${z.x}px, ${z.y}px) scale(${z.s})`;
+  };
+  // 換頁、旋轉時回到 1x
+  useLayoutEffect(() => {
+    for (const s of ref.current!.querySelectorAll<HTMLElement>('.page-slot')) s.style.transform = '';
+    zoomRef.current = NO_ZOOM;
+    setZoom(1);
+  }, [cur, width, viewportH]);
 
   useEffect(() => onPageChange(cur), [cur]);
 
@@ -195,8 +217,8 @@ export function PageList(props: Props) {
   };
 
   // 單指左右拖動：頁面跟著手指走，放開後翻頁或彈回；Pencil 書寫中（手掌）、雙指、放大時不算
-  const latest = useRef({ cur, n, flip, onFlipPastEnd, strideX, pageW, animate, stopAnimation });
-  latest.current = { cur, n, flip, onFlipPastEnd, strideX, pageW, animate, stopAnimation };
+  const latest = useRef({ cur, n, flip, onFlipPastEnd, strideX, pageW, pageH, width, topInset, animate, stopAnimation, applyZoom, setZoom });
+  latest.current = { cur, n, flip, onFlipPastEnd, strideX, pageW, pageH, width, topInset, animate, stopAnimation, applyZoom, setZoom };
   useEffect(() => {
     const el = ref.current!;
     // 起點與最後位置（iPad 中途接管手勢時會送 pointercancel，用最後位置判斷）
@@ -252,6 +274,38 @@ export function PageList(props: Props) {
       latest.current.animate();
       t.style.transform = `translateX(${base()}px)`;
     };
+    // ---- 縮放與平移 ----
+    /** 目前頁沒縮放時左上角在畫面上的位置 */
+    const slotOrigin = () => {
+      const r = el.getBoundingClientRect();
+      const { width, pageW } = latest.current;
+      return { x: r.left + (width - pageW) / 2, y: r.top };
+    };
+    /** 把位移限制在看得到的範圍內（頂端固定區域以下、左右與下方留 GAP） */
+    const clampZoom = (z: Zoom): Zoom => {
+      const { pageW, pageH, topInset } = latest.current;
+      const o = slotOrigin();
+      const vw = document.documentElement.clientWidth;
+      const vh = document.documentElement.clientHeight;
+      return {
+        s: z.s,
+        x: clampPan(o.x + z.x, pageW * z.s, GAP, vw - GAP) - o.x,
+        y: clampPan(o.y + z.y, pageH * z.s, topInset + GAP, vh - GAP) - o.y,
+      };
+    };
+    let pinch: { d0: number; mx: number; my: number; z0: Zoom } | null = null;
+    let pan: { x: number; y: number; z0: Zoom } | null = null;
+    let zoomTimer = 0;
+    const two = () => [...touches.values()].slice(0, 2);
+    /** 手勢結束：低於 1x 彈回、位置拉回範圍內，動畫結束後依倍率重繪 */
+    const endZoom = () => {
+      const z = zoomRef.current;
+      const target = z.s <= 1 ? NO_ZOOM : clampZoom(z);
+      latest.current.applyZoom(target, true);
+      clearTimeout(zoomTimer);
+      zoomTimer = window.setTimeout(() => latest.current.setZoom(target.s), ZOOM_ANIM_MS + 20);
+    };
+
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'pen') {
         penDown = pen = true;
@@ -268,12 +322,25 @@ export function PageList(props: Props) {
         pen = penDown;
       }
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp, lx: e.clientX, ly: e.clientY, lt: e.timeStamp });
+      pan = null;
       if (touches.size > 1) {
         multi = true;
         if (dragging) {
           dragging = false;
           settle();
         }
+        if (!pen && touches.size === 2) {
+          const [a, b] = two();
+          pinch = {
+            d0: Math.hypot(a.lx - b.lx, a.ly - b.ly) || 1,
+            mx: (a.lx + b.lx) / 2,
+            my: (a.ly + b.ly) / 2,
+            z0: zoomRef.current,
+          };
+        }
+      } else if (zoomRef.current.s > 1 && !pen) {
+        // 放大時單指 = 平移白紙
+        pan = { x: e.clientX, y: e.clientY, z0: zoomRef.current };
       }
     };
     const move = (e: PointerEvent) => {
@@ -282,7 +349,26 @@ export function PageList(props: Props) {
       t.lx = e.clientX;
       t.ly = e.clientY;
       t.lt = e.timeStamp;
-      if (multi || pen || zoomed()) return;
+      if (pinch && touches.size >= 2) {
+        // 以兩指中點為錨點：手指下的那一點跟著手指走
+        const [a, b] = two();
+        const { d0, mx, my, z0 } = pinch;
+        const s = clamp((z0.s * Math.hypot(a.lx - b.lx, a.ly - b.ly)) / d0, MIN_PINCH, MAX_ZOOM);
+        const o = slotOrigin();
+        const px = (mx - o.x - z0.x) / z0.s;
+        const py = (my - o.y - z0.y) / z0.s;
+        const cx = (a.lx + b.lx) / 2;
+        const cy = (a.ly + b.ly) / 2;
+        latest.current.applyZoom({ s, x: cx - o.x - px * s, y: cy - o.y - py * s });
+        return;
+      }
+      if (pan) {
+        latest.current.applyZoom(
+          clampZoom({ s: pan.z0.s, x: pan.z0.x + e.clientX - pan.x, y: pan.z0.y + e.clientY - pan.y }),
+        );
+        return;
+      }
+      if (multi || pen) return;
       const dx = e.clientX - t.x;
       const dy = e.clientY - t.y;
       if (!dragging && Math.abs(dx) > DRAG_LOCK && Math.abs(dx) > Math.abs(dy)) {
@@ -301,7 +387,16 @@ export function PageList(props: Props) {
       touches.delete(e.pointerId);
       const wasDragging = dragging;
       dragging = false;
-      if (multi || pen || zoomed()) {
+      if (pinch && touches.size < 2) {
+        pinch = null;
+        endZoom();
+        return;
+      }
+      if (pan) {
+        pan = null;
+        return;
+      }
+      if (multi || pen) {
         if (wasDragging) settle();
         return;
       }
@@ -331,6 +426,7 @@ export function PageList(props: Props) {
     el.addEventListener('pointercancel', up, true);
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(zoomTimer);
       el.removeEventListener('pointerdown', down, true);
       el.removeEventListener('pointermove', move, true);
       el.removeEventListener('pointerup', up, true);
@@ -369,10 +465,12 @@ export function PageList(props: Props) {
               <div
                 key={p.id}
                 class="page-slot"
+                data-slot={i}
                 style={{ left: px(i * strideX + (width - pageW) / 2), width: px(pageW), height: px(pageH) }}
               >
                 <PageCanvas
                   index={i}
+                  zoom={i === cur ? zoom : 1}
                   pageId={p.id}
                   images={images}
                   template={p.template}

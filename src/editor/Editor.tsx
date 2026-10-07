@@ -27,7 +27,6 @@ import { PageActions } from './PageActions';
 import type { NewStroke, PenSettings } from './PageCanvas';
 import { PageList, type PageListHandle } from './PageList';
 import { QuickBar } from './QuickBar';
-import { useHudViewport } from './hud';
 import { Thumbnails } from './Thumbnails';
 import { Toolbar, toolOption, type ToolState } from './Toolbar';
 import { tools, type ToolDef } from './tools';
@@ -289,8 +288,6 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     execute(addPageCommand(pages.length, nextPageTemplate(last, notebook.template)));
   };
 
-  useHudViewport();
-
   useLayoutEffect(() => {
     const band = document.querySelector<HTMLElement>('.top-band')!;
     const root = document.documentElement.style;
@@ -323,7 +320,7 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
 
   return (
     <div class="editor">
-      {/* 浮在頁面上的介面：放大時反向縮放，維持原本大小（見 hud.ts） */}
+      {/* 浮在頁面上的介面：固定在畫面上，不跟白紙一起縮放 */}
       <div class="hud">
         {/* 快捷列放進 App 的頂端固定區域（不蓋住白紙） */}
         {createPortal(

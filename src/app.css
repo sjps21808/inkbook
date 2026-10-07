@@ -163,6 +163,7 @@ html, body {
 .page-slot {
   position: absolute;
   top: 0;
+  transform-origin: 0 0; /* 白紙縮放（transform 由 PageList 設定） */
 }
 
 .page {
@@ -171,13 +172,13 @@ html, body {
   height: 100%;
   background: #fff; /* 白紙：深色模式也不變 */
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
-  /* 手指：單指滑動由 JS 判斷翻頁，雙指原生縮放（不含雙擊放大）；筆由 JS 處理 */
-  touch-action: pinch-zoom;
+  /* 手指：單指翻頁或平移、雙指縮放白紙，全部由 JS 處理（不用原生捲動與縮放）；筆由 JS 處理 */
+  touch-action: none;
 }
 
-/* 放大時單指要能原生平移 */
-html[data-zoomed] .page {
-  touch-action: pan-x pan-y pinch-zoom;
+/* 白紙縮放放開後彈回範圍內時的動畫 */
+.page-slot.zoom-anim {
+  transition: transform 200ms ease-out;
 }
 
 .page canvas,
@@ -216,8 +217,8 @@ html[data-zoomed] .page {
   z-index: 10;
 }
 
-/* 編輯頁：浮在頁面上的介面都在 .hud 裡。放大時平移到看得到的區域並縮回 1/倍率，維持原本大小
-   （變數由 editor/hud.ts 依 visualViewport 設定）；transform 讓裡面 position: fixed 的元素改以 .hud 定位 */
+/* 編輯頁：浮在頁面上的介面（頂端固定區域、大選單、縮圖側欄、對話框）都在 .hud 裡，固定在畫面上；
+   縮放只作用在白紙，這些介面不受影響 */
 html[data-chrome] .hud {
   position: fixed;
   top: 0;
@@ -226,8 +227,6 @@ html[data-chrome] .hud {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  transform-origin: 0 0;
-  transform: translate(var(--vv-x, 0px), var(--vv-y, 0px)) scale(var(--vv-inv, 1));
 }
 
 html[data-chrome] .hud > * {
