@@ -74,3 +74,12 @@ test('拖曳縮圖重新排序，undo 恢復', async ({ page }) => {
   await page.getByRole('button', { name: '復原' }).click();
   await expect.poll(() => pageOrder(page)).toEqual(before);
 });
+
+test('縮圖側欄從頂端固定區域與大選單下方開始，不被蓋住；收起大選單後往上移', async ({ page }) => {
+  await toggle(page);
+  const top = (s: string) => page.evaluate((s) => document.querySelector(s)!.getBoundingClientRect().top, s);
+  const bottom = (s: string) => page.evaluate((s) => document.querySelector(s)!.getBoundingClientRect().bottom, s);
+  await expect.poll(() => top('.thumbnails')).toBeCloseTo((await bottom('.menu-drop')) + 8, 0);
+  await page.getByRole('button', { name: '收起選單' }).click();
+  await expect.poll(() => top('.thumbnails')).toBeCloseTo((await bottom('.top-band')) + 8, 0);
+});

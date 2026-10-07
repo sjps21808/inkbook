@@ -1,4 +1,4 @@
-import type { ComponentChildren } from 'preact';
+import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { InkDatabase } from '../db/db';
 import {
@@ -38,8 +38,6 @@ interface Props {
   notebook: Notebook;
   initialPages: Page[];
   onBack(): void;
-  /** 筆記本分頁列（放在頂端固定區域最上面） */
-  tabBar?: ComponentChildren;
 }
 
 type Cache = Record<string, PageElement[]>;
@@ -47,7 +45,7 @@ type Cache = Record<string, PageElement[]>;
 /** 等 Preact 把狀態更新畫到畫面上 */
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
-export function Editor({ db, notebook, initialPages, onBack, tabBar }: Props) {
+export function Editor({ db, notebook, initialPages, onBack }: Props) {
   const [pages, setPages] = useState(initialPages);
   // 已載入頁面的 element；ref 同步更新，讓連續書寫時 z 不會重複
   const [cache, setCache] = useState<Cache>({});
@@ -57,8 +55,7 @@ export function Editor({ db, notebook, initialPages, onBack, tabBar }: Props) {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const [initialIndex] = useState(() => loadLastPage(notebook.id, initialPages));
   const [current, setCurrent] = useState(initialIndex);
-  // 頂端固定區域的高度：頁面從它下面開始（--band-h 給 CSS 用：編輯區上邊距、大選單、縮圖側欄的位置）
-  const bandRef = useRef<HTMLDivElement>(null);
+  // 頂端固定區域（App 的 .top-band）的高度：頁面從它下面開始（--band-h 給 CSS 用：編輯區上邊距、大選單、縮圖側欄的位置）
   const [bandH, setBandH] = useState(0);
   const cacheRef = useRef<Cache>(cache);
   const loading = useRef(new Set<string>());
@@ -295,7 +292,7 @@ export function Editor({ db, notebook, initialPages, onBack, tabBar }: Props) {
   useHudViewport();
 
   useLayoutEffect(() => {
-    const band = bandRef.current!;
+    const band = document.querySelector<HTMLElement>('.top-band')!;
     const root = document.documentElement.style;
     // 精確高度（可能有小數；不受放大時 .hud 縮放影響）
     const update = (h: number) => {
@@ -305,9 +302,15 @@ export function Editor({ db, notebook, initialPages, onBack, tabBar }: Props) {
     update(band.offsetHeight);
     const ro = new ResizeObserver(([e]) => update(e.borderBoxSize?.[0]?.blockSize ?? band.offsetHeight));
     ro.observe(band);
+    // 大選單的高度（收起時為 0）：縮圖側欄從大選單下方開始，不被蓋住
+    const drop = document.querySelector<HTMLElement>('.menu-drop')!;
+    const menuRo = new ResizeObserver(() => root.setProperty('--menu-h', `${drop.offsetHeight}px`));
+    menuRo.observe(drop);
     return () => {
       ro.disconnect();
+      menuRo.disconnect();
       root.removeProperty('--band-h');
+      root.removeProperty('--menu-h');
     };
   }, []);
 
@@ -322,9 +325,8 @@ export function Editor({ db, notebook, initialPages, onBack, tabBar }: Props) {
     <div class="editor">
       {/* 浮在頁面上的介面：放大時反向縮放，維持原本大小（見 hud.ts） */}
       <div class="hud">
-        {/* 頂端固定區域：不蓋住白紙 */}
-        <div class="top-band" ref={bandRef}>
-          {tabBar}
+        {/* 快捷列放進 App 的頂端固定區域（不蓋住白紙） */}
+        {createPortal(
           <QuickBar
             state={toolState}
             onChange={onToolChange}
@@ -337,8 +339,9 @@ export function Editor({ db, notebook, initialPages, onBack, tabBar }: Props) {
             hasSelection={!!selection && selection.ids.length > 0}
             onDuplicate={duplicateSelection}
             onDeleteSelection={deleteSelection}
-          />
-        </div>
+          />,
+          document.getElementById('quickbar-slot')!,
+        )}
         {/* 大選單：從頂端固定區域下方展開，蓋在白紙上 */}
         <div class="menu-drop">
           <Toolbar title={notebook.title} onBack={onBack} state={toolState} onChange={onToolChange} onAction={onAction}>

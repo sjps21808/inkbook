@@ -20,10 +20,10 @@ test.beforeEach(async ({ page }) => {
   await openNewNotebook(page, '測試筆記', false);
 });
 
-test('預設收起：只有浮動列；展開後大選單出現，重新整理後維持；收起後也維持', async ({ page }) => {
+test('預設收起：大選單（工具列）不顯示、資訊列與快捷列一直顯示；展開收起都會記住', async ({ page }) => {
   await expect(quick(page)).toBeVisible();
   await expect(menu(page)).toBeHidden();
-  await expect(page.locator('.topbar')).toBeHidden();
+  await expect(page.locator('.topbar')).toBeVisible(); // 資訊列不受 ▼▲ 影響
   expect(await pageInView(page)).toBe(true);
 
   await toggle(page, '展開選單').click();
@@ -58,18 +58,23 @@ test('快捷列在頂端固定區域裡，白紙從它下面開始；大選單�
   expect(await topOf(page, '.page[data-index="0"]')).toBeGreaterThanOrEqual(band);
   expect(await pageInView(page)).toBe(true);
 
+  // 分頁列／資訊列／快捷列由上而下都在固定區域裡
+  expect(await bottomOf(page, '.topbar')).toBeLessThanOrEqual(barTop);
+  expect(await bottomOf(page, '.tabs-row')).toBeLessThanOrEqual(await topOf(page, '.topbar'));
+  const infoTop = await topOf(page, '.topbar');
+
   await toggle(page, '展開選單').click();
   await expect(menu(page)).toBeVisible();
-  // 快捷列不動；頂端列＋工具列接在固定區域下方
+  // 快捷列、資訊列都不動；大選單（工具列）接在固定區域下方
   expect(await topOf(page, '.quickbar')).toBe(barTop);
-  await expect.poll(() => topOf(page, '.topbar')).toBeCloseTo(band, 0);
-  await expect.poll(() => topOf(page, '.toolbar')).toBeCloseTo(await bottomOf(page, '.topbar'), 0);
+  expect(await topOf(page, '.topbar')).toBe(infoTop);
+  await expect.poll(() => topOf(page, '.toolbar')).toBeCloseTo(band, 0);
 
   // 大選單展開狀態下重新整理：位置一樣，快捷列點得到
   await page.reload();
   await waitReady(page);
   await expect(menu(page)).toBeVisible();
-  await expect.poll(() => topOf(page, '.topbar')).toBeCloseTo(band, 0);
+  await expect.poll(() => topOf(page, '.toolbar')).toBeCloseTo(band, 0);
   await quick(page).getByRole('button', { name: '粗' }).click();
   await expect(quick(page).getByRole('button', { name: '粗' })).toHaveAttribute('aria-pressed', 'true');
 });
@@ -139,17 +144,18 @@ test('套索選取時浮動列出現複製、刪除選取', async ({ page }) => 
   await expect(q.getByRole('button', { name: '刪除選取' })).toHaveCount(0);
 });
 
-test('大選單收起時有新版本：☰ 顯示紅點，展開後消失', async ({ page }) => {
-  const dot = () =>
-    page.evaluate(() => getComputedStyle(document.querySelector('.menu-toggle')!, '::after').content);
-  expect(await dot()).toBe('none');
+test('大選單收起時，資訊列上的「有新版本」也看得到、點得到', async ({ page }) => {
   // 模擬 UpdatePrompt 偵測到新版（測試時擋掉 SW）
   await page.evaluate(() => {
     const b = document.createElement('button');
     b.className = 'update-btn';
+    b.textContent = '有新版本';
+    b.onclick = () => (b.dataset.clicked = '1');
     document.querySelector('.topbar')!.append(b);
   });
-  await expect.poll(dot).not.toBe('none');
-  await toggle(page, '展開選單').click();
-  await expect.poll(dot).toBe('none');
+  await expect(menu(page)).toBeHidden();
+  const btn = page.getByRole('button', { name: '有新版本' });
+  await expect(btn).toBeVisible();
+  await btn.click();
+  await expect(btn).toHaveAttribute('data-clicked', '1');
 });

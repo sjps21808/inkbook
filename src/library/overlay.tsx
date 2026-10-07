@@ -4,7 +4,7 @@ import { render, type VNode } from 'preact';
 export function showOverlay(build: (close: () => void) => VNode): void {
   const host = document.createElement('div');
   // 編輯頁放大時對話框也不跟著放大（見 editor/hud.ts）
-  host.className = 'hud';
+  host.className = 'hud overlay-hud';
   document.body.appendChild(host);
   const close = () => {
     render(null, host);

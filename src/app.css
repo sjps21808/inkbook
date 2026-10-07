@@ -234,26 +234,36 @@ html[data-chrome] .hud > * {
   pointer-events: auto;
 }
 
-html[data-chrome] .topbar {
-  position: fixed;
-  left: 0;
-  right: 0;
+/* 頂端固定區域（分頁列／資訊列／快捷列）：在 App 的 .app-hud 裡，白紙從它下面開始，不被蓋住；
+   編輯頁量好高度寫進 --band-h。高於大選單：快捷列跳出的色盤、模式選單蓋在大選單上面 */
+html[data-chrome] .app-hud {
+  z-index: 30;
 }
 
-/* 頂端固定區域（分頁列＋快捷列）：白紙從它下面開始，不被蓋住；高度由 Editor 量好寫進 --band-h */
+/* 對話框蓋過頂端固定區域 */
+html[data-chrome] .overlay-hud {
+  z-index: 40;
+}
+
 .top-band {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 30; /* 高於大選單：快捷列跳出的色盤、模式選單蓋在大選單上面 */
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: calc(6px + env(safe-area-inset-top)) 8px 6px;
+}
+
+html[data-chrome] .top-band {
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+}
+
+/* 快捷列（Editor 用 portal 放進來；書架頁是空的） */
+.quickbar-slot {
+  display: flex;
+  justify-content: center;
+  padding: 6px 8px;
+}
+
+.quickbar-slot:empty {
+  display: none;
 }
 
 /* 筆記本分頁列：太多時左右滑動；「＋」固定在最右邊 */
@@ -353,15 +363,10 @@ html[data-chrome] .topbar {
   border-radius: 8px;
 }
 
-/* 大選單（頂端列＋工具列）從頂端固定區域下方展開，蓋在白紙上 */
-html[data-chrome] .topbar {
-  top: var(--band-h, 0px);
-  padding-top: 0;
-}
-
+/* 大選單（工具列那一層）從頂端固定區域下方展開，蓋在白紙上 */
 .menu-drop {
   position: fixed;
-  top: calc(var(--band-h, 0px) + 53px); /* 頂端列高 52px + 下框線 1px */
+  top: var(--band-h, 0px);
   left: 0;
   right: 0;
   z-index: 25;
@@ -384,10 +389,9 @@ html[data-chrome] .editor {
 }
 
 html[data-chrome] .thumbnails {
-  top: calc(var(--band-h, 0px) + 8px);
+  top: calc(var(--band-h, 0px) + var(--menu-h, 0px) + 8px);
 }
 
-html[data-chrome="collapsed"] .topbar,
 html[data-chrome="collapsed"] .toolbar {
   display: none;
 }
@@ -494,22 +498,6 @@ html[data-chrome="collapsed"] .toolbar {
 .color-grid .swatch {
   padding: 0;
   border: none;
-  border-radius: 50%;
-}
-
-/* 大選單收起時有新版本：☰ 上顯示紅點（「有新版本」按鈕在隱藏的頂端列裡） */
-.menu-toggle {
-  position: relative;
-}
-
-html[data-chrome="collapsed"]:has(.update-btn) .menu-toggle::after {
-  content: "";
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 10px;
-  height: 10px;
-  background: #e53935;
   border-radius: 50%;
 }
 

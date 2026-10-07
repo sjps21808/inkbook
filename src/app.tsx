@@ -1,4 +1,3 @@
-import type { VNode } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { loadNotebook, requestPersist, type OpenedNotebook } from './bootstrap';
 import { openInkDb, type InkDatabase } from './db/db';
@@ -10,7 +9,7 @@ import { TabBar } from './TabBar';
 import { closeTab, loadTabs, moveTab, openTab, pruneTabs, saveTabs } from './tabs';
 import { ThemeSelect } from './ThemeSelect';
 
-function NotebookView({ db, id, tabBar }: { db: InkDatabase; id: string; tabBar: VNode }) {
+function NotebookView({ db, id }: { db: InkDatabase; id: string }) {
   const [opened, setOpened] = useState<OpenedNotebook | null | undefined>(undefined);
   useEffect(() => {
     void loadNotebook(db, id).then(setOpened);
@@ -24,7 +23,6 @@ function NotebookView({ db, id, tabBar }: { db: InkDatabase; id: string; tabBar:
       notebook={opened.notebook}
       initialPages={opened.pages}
       onBack={() => (location.hash = '#/')}
-      tabBar={tabBar}
     />
   );
 }
@@ -73,20 +71,23 @@ export function App() {
   return (
     <>
       <div class="hud app-hud">
-        {/* 書架頁也顯示分頁列（編輯頁的分頁列在頂端固定區域裡） */}
-        {route.name === 'library' && tabs.length > 0 && tabBar}
-        <header class="topbar">
-          <h1>InkBook</h1>
-          <span class="version">版本 {__APP_VERSION__}</span>
-          <ThemeSelect />
-          <UpdatePrompt />
-        </header>
+        {/* 頂端固定區域：分頁列／資訊列（一直顯示）／快捷列（編輯頁用 portal 放進 #quickbar-slot） */}
+        <div class="top-band">
+          {tabs.length > 0 && tabBar}
+          <header class="topbar">
+            <h1>InkBook</h1>
+            <span class="version">版本 {__APP_VERSION__}</span>
+            <ThemeSelect />
+            <UpdatePrompt />
+          </header>
+          <div class="quickbar-slot" id="quickbar-slot" />
+        </div>
       </div>
       <main>
         {!db ? (
           <p class="empty">載入中…</p>
         ) : route.name === 'notebook' ? (
-          <NotebookView key={route.id} db={db} id={route.id} tabBar={tabBar!} />
+          <NotebookView key={route.id} db={db} id={route.id} />
         ) : (
           <Library db={db} onOpen={(id) => (location.hash = notebookHash(id))} />
         )}
