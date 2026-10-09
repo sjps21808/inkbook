@@ -66,6 +66,36 @@ export function drawStroke(ctx: CanvasRenderingContext2D, s: StrokeElement, scal
   ctx.restore();
 }
 
+/**
+ * 書寫中的即時預覽：直接用原始點畫一條圓頭折線（canvas 原生 stroke），不算 perfect-freehand 輪廓。
+ * 每個 frame 重算整筆輪廓會隨筆畫變長越來越慢，快速書寫時筆跡跟不上筆尖；放開後才用 drawStroke 畫正式的一筆。
+ */
+export function drawLiveStroke(ctx: CanvasRenderingContext2D, s: StrokeElement, scale: number): void {
+  const p = s.points;
+  if (p.length < 3) return;
+  ctx.save();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.strokeStyle = s.color;
+  ctx.fillStyle = s.color;
+  ctx.lineWidth = s.width;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (s.tool === 'highlighter') {
+    ctx.globalAlpha = HIGHLIGHTER_ALPHA;
+    ctx.globalCompositeOperation = 'multiply';
+  }
+  ctx.beginPath();
+  if (p.length < 6) {
+    ctx.arc(p[0], p[1], s.width / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.moveTo(p[0], p[1]);
+    for (let i = 3; i + 1 < p.length; i += 3) ctx.lineTo(p[i], p[i + 1]);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /** 依 blobId 取得已解碼的圖片；還沒解碼時回傳 undefined（略過不畫） */
 export type ImageSource = (blobId: string) => CanvasImageSource | undefined;
 

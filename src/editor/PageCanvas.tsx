@@ -10,7 +10,7 @@ import {
 import type { PdfDocs, PdfRef, RenderJob } from '../pdf/render';
 import { TEXT_LINE_HEIGHT } from './geometry';
 import type { ImageCache } from './images';
-import { drawStroke, renderInk } from './stroke';
+import { drawLiveStroke, drawStroke, renderInk } from './stroke';
 import { blurEditing, focusProxy } from './text';
 import { drawTemplate } from './templates';
 import type { ToolDef } from './tools';
@@ -202,7 +202,7 @@ export function PageCanvas(props: Props) {
     const drawLive = () => {
       raf = 0;
       clearLive();
-      if (pointerId !== null) drawStroke(live.getContext('2d')!, current(), scaleRef.current);
+      if (pointerId !== null) drawLiveStroke(live.getContext('2d')!, current(), scaleRef.current);
     };
     const schedule = () => {
       if (!raf) raf = requestAnimationFrame(drawLive);

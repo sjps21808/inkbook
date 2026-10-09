@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { outlineToSvgPath, renderInk, strokeOutline } from '../src/editor/stroke';
+import { drawLiveStroke, outlineToSvgPath, renderInk, strokeOutline } from '../src/editor/stroke';
 import type { PageElement, StrokeElement } from '../src/db/schema';
 
 const line = (pressure: number) => {
@@ -69,6 +69,46 @@ describe('outlineToSvgPath', () => {
     ]);
     expect(d).toBe('M0 0Q0 0 5 0Q10 0 10 5Z');
     expect(outlineToSvgPath([])).toBe('');
+  });
+});
+
+describe('drawLiveStroke', () => {
+  const fakeCtx = () => {
+    const calls: string[] = [];
+    const ctx = {
+      save() {},
+      restore() {},
+      setTransform() {},
+      beginPath() {},
+      moveTo: () => calls.push('moveTo'),
+      lineTo: () => calls.push('lineTo'),
+      arc: () => calls.push('arc'),
+      stroke: () => calls.push('stroke'),
+      fill: () => calls.push('fill'),
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
+  };
+  const stroke = (points: number[]): StrokeElement => ({
+    id: '',
+    pageId: '',
+    z: 0,
+    type: 'stroke',
+    tool: 'pen',
+    color: '#000',
+    width: 3,
+    points: new Float32Array(points),
+  });
+
+  it('直接用原始點畫一條折線（每個點一次 lineTo、只 stroke 一次），不算輪廓', () => {
+    const { ctx, calls } = fakeCtx();
+    drawLiveStroke(ctx, stroke(Array.from(line(0.5))), 2);
+    expect(calls).toEqual(['moveTo', ...Array(20).fill('lineTo'), 'stroke']);
+  });
+
+  it('單點畫成圓點', () => {
+    const { ctx, calls } = fakeCtx();
+    drawLiveStroke(ctx, stroke([10, 10, 0.5]), 2);
+    expect(calls).toEqual(['arc', 'fill']);
   });
 });
 
