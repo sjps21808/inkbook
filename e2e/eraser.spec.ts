@@ -79,6 +79,18 @@ test('橡皮擦模式選單：只有選中的橡皮擦再點才出現，點外�
   await expect(page.getByRole('toolbar', { name: '工具列' }).getByRole('button', { name: '局部' })).toHaveCount(0);
 });
 
+test('有選項的工具選中時圖示旁有小箭頭，筆、未選中的工具沒有', async ({ page }) => {
+  const chevron = (name: string) => page.locator(`.quickbar button[aria-label="${name}"] .chevron`);
+  // beforeEach 已選了橡皮擦
+  await expect(chevron('橡皮擦')).toBeVisible();
+  await expect(chevron('套索')).toHaveCount(0);
+  await button(page, '套索').click();
+  await expect(chevron('套索')).toBeVisible();
+  await expect(chevron('橡皮擦')).toHaveCount(0);
+  await button(page, '筆').click();
+  await expect(page.locator('.quickbar .chevron')).toHaveCount(0);
+});
+
 /** 與筆畫（y = 0.3、筆「中」寬 3pt）平行、相距 d pt 的一條水平線 */
 const parallel = (d: number): Pt[] => hLine(0.3 + d / 842, 0.3, 0.7);
 

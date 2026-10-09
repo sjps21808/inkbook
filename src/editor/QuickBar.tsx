@@ -3,6 +3,7 @@ import { useRef, useState } from 'preact/hooks';
 import { ColorPicker } from './ColorPicker';
 import { useDismiss } from './dismiss';
 import {
+  ChevronIcon,
   DuplicateIcon,
   EraserIcon,
   HighlighterIcon,
@@ -69,6 +70,7 @@ function ToolButton({ id, state, onChange }: { id: string; state: ToolState; onC
         }}
       >
         <ToolIcon />
+        {active && t.options && <ChevronIcon />}
       </button>
       {open && t.options && (
         <div class="tool-options" role="group" aria-label={`${t.label}模式`}>

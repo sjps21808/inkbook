@@ -64,6 +64,24 @@ export const RectLassoIcon = () => (
   </Icon>
 );
 
+/** 有選項的工具選中時，圖示旁的小箭頭（再點一次跳出選單） */
+export const ChevronIcon = () => (
+  <svg
+    class="chevron"
+    viewBox="0 0 12 12"
+    width="12"
+    height="12"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 4.5l3 3 3-3" />
+  </svg>
+);
+
 /** 粗細：一條橫線，線寬依段數 */
 export const WidthIcon = ({ width }: { width: number }) => (
   <Icon>

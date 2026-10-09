@@ -441,6 +441,17 @@ html[data-chrome="collapsed"] .toolbar {
   position: relative;
 }
 
+/* 有選項的工具選中時：圖示旁加小箭頭，按鈕變寬 */
+.quickbar .tool-button > button:has(.chevron) {
+  width: 60px;
+  gap: 2px;
+}
+
+.quickbar .chevron {
+  flex: none;
+  opacity: 0.7;
+}
+
 /* 橡皮擦「局部／整筆」小選單 */
 .tool-options {
   position: absolute;
