@@ -26,6 +26,38 @@ describe('strokeOutline', () => {
   it('單點（點一下）也有輪廓', () => {
     expect(strokeOutline(new Float32Array([10, 10, 0.5]), 4).length).toBeGreaterThan(0);
   });
+
+  it('畫太快（點很稀疏）時輪廓不會有反折的缺口', () => {
+    // 稀疏的弧線：相鄰兩點相距約 20pt
+    const a: number[] = [];
+    for (let t = 0; t < Math.PI * 1.5; t += 0.2) a.push(200 + 60 * Math.cos(t), 200 + 120 * Math.sin(t), 0.5);
+    const width = 5;
+    const o = strokeOutline(new Float32Array(a), width);
+    // nonzero 填色：輸入折線上（含兩側 0.3 線寬）每一點的 winding 都不可以是 0
+    const wind = (x: number, y: number) => {
+      let w = 0;
+      for (let i = 0; i < o.length; i++) {
+        const [ax, ay] = o[i];
+        const [bx, by] = o[(i + 1) % o.length];
+        const cross = (bx - ax) * (y - ay) - (x - ax) * (by - ay);
+        if (ay <= y) {
+          if (by > y && cross > 0) w++;
+        } else if (by <= y && cross < 0) w--;
+      }
+      return w;
+    };
+    let holes = 0;
+    for (let i = 6; i + 5 < a.length - 6; i += 3) {
+      const [ax, ay, bx, by] = [a[i], a[i + 1], a[i + 3], a[i + 4]];
+      const len = Math.hypot(bx - ax, by - ay);
+      const [nx, ny] = [-(by - ay) / len, (bx - ax) / len];
+      for (let k = 0; k <= 20; k++) {
+        const [x, y] = [ax + ((bx - ax) * k) / 20, ay + ((by - ay) * k) / 20];
+        for (const r of [-0.3, 0, 0.3]) if (wind(x + nx * r * width, y + ny * r * width) === 0) holes++;
+      }
+    }
+    expect(holes).toBe(0);
+  });
 });
 
 describe('outlineToSvgPath', () => {

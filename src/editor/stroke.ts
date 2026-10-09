@@ -3,10 +3,21 @@ import type { ImageElement, PageElement, StrokeElement } from '../db/schema';
 
 export const HIGHLIGHTER_ALPHA = 0.5;
 
+/** 算輪廓前把相鄰點補到最多相距這麼多 pt：畫太快時點很稀疏，彎處輪廓內側會反折，填色後變成白色缺口 */
+const MAX_GAP = 0.5;
+
 /** 固定線寬的輪廓（M-1 決策：不做壓感，忽略 pressure） */
 export function strokeOutline(points: Float32Array, width: number): number[][] {
   const pts: [number, number][] = [];
-  for (let i = 0; i + 1 < points.length; i += 3) pts.push([points[i], points[i + 1]]);
+  for (let i = 0; i + 1 < points.length; i += 3) {
+    const [x, y] = [points[i], points[i + 1]];
+    if (i > 0) {
+      const [px, py] = [points[i - 3], points[i - 2]];
+      const n = Math.ceil(Math.hypot(x - px, y - py) / MAX_GAP);
+      for (let k = 1; k < n; k++) pts.push([px + ((x - px) * k) / n, py + ((y - py) * k) / n]);
+    }
+    pts.push([x, y]);
+  }
   return getStroke(pts, {
     size: width,
     thinning: 0,
