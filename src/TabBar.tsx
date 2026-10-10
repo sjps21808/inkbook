@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { InkDatabase } from './db/db';
+import { HomeIcon } from './editor/icons';
 import { getNotebook } from './db/repo';
 import { moveTab, NOTEBOOKS_CHANGED } from './tabs';
 
@@ -10,7 +11,7 @@ interface Props {
   active: string | null;
   onSelect(id: string): void;
   onClose(id: string): void;
-  /** 「＋」：回書架挑別本 */
+  /** 房屋圖示：回書架挑別本 */
   onAdd(): void;
   /** 這些分頁的筆記本已經不存在 */
   onMissing(ids: string[]): void;
@@ -167,7 +168,7 @@ export function TabBar({ db, tabs, active, onSelect, onClose, onAdd, onMissing, 
         })}
       </div>
       <button class="tab-add" aria-label="開啟其他筆記本" onClick={onAdd}>
-        ＋
+        <HomeIcon />
       </button>
     </div>
   );

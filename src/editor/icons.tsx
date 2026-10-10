@@ -64,6 +64,14 @@ export const RectLassoIcon = () => (
   </Icon>
 );
 
+/** 分頁列右邊：回書架（簡易房屋） */
+export const HomeIcon = () => (
+  <Icon>
+    <path d="M4 11l8-7 8 7" />
+    <path d="M6 9.5V20h4.5v-5h3v5H18V9.5" />
+  </Icon>
+);
+
 /** 有選項的工具選中時，圖示旁的小箭頭（再點一次跳出選單） */
 export const ChevronIcon = () => (
   <svg

@@ -38,6 +38,9 @@ test('關閉分頁：關目前的切到旁邊，全關回書架；「＋」回�
   await expect(tabs(page)).toHaveCount(2);
   await expect(activeTitle(page)).toHaveText('丙'); // 右邊那個
 
+  // 回書架的按鈕是房屋圖示，不是「＋」
+  await expect(page.getByRole('button', { name: '開啟其他筆記本' })).not.toContainText('＋');
+  await expect(page.getByRole('button', { name: '開啟其他筆記本' }).locator('svg')).toBeVisible();
   await page.getByRole('button', { name: '開啟其他筆記本' }).click();
   await expect(page.getByRole('button', { name: '新增筆記本' })).toBeVisible();
   await expect(tabTitles(page)).toHaveText(['甲', '丙']);
