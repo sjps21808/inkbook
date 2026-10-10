@@ -31,6 +31,8 @@ import { Thumbnails } from './Thumbnails';
 import { Toolbar, toolOption, type ToolState } from './Toolbar';
 import { tools, type ToolDef } from './tools';
 import { loadToolState, saveToolState } from './toolMemory';
+import { isDebug, recordStroke, strokeDumpFile } from './strokeDebug';
+import { shareOrDownload } from '../library/backupActions';
 
 interface Props {
   db: InkDatabase;
@@ -134,6 +136,8 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
     const cur = cacheRef.current[pageId] ?? [];
     const z = cur.reduce((m, e) => Math.max(m, e.z), -1) + 1;
     const el: StrokeElement = { id: newId(), pageId, z, type: 'stroke', ...s };
+    const pageEl = document.querySelector(`.page[data-index="${pages.findIndex((p) => p.id === pageId)}"]`);
+    recordStroke(s, pageEl?.getBoundingClientRect().width ?? 0);
     // 先放進 ref（畫面在 execute 裡更新），下一筆的 z 才會正確
     cacheRef.current = { ...cacheRef.current, [pageId]: [...cur, el] };
     void history.execute(elementsCommand(store, pageId, [el])).finally(refresh);
@@ -377,6 +381,19 @@ export function Editor({ db, notebook, initialPages, onBack }: Props) {
                 匯出 PDF
               </button>
             </div>
+            {/* 除錯：匯出最後一筆的原始點，給開發者重現問題 */}
+            {isDebug() && (
+              <div class="group">
+                <button
+                  onClick={() => {
+                    const file = strokeDumpFile();
+                    if (file) void shareOrDownload(file);
+                  }}
+                >
+                  匯出最後一筆
+                </button>
+              </div>
+            )}
             <PageActions
               defaultTemplate={notebook.template}
               canDelete={pages.length > 1}
