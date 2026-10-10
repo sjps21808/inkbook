@@ -1,32 +1,6 @@
-import { getStroke } from 'perfect-freehand';
 import type { ImageElement, PageElement, StrokeElement } from '../db/schema';
 
 export const HIGHLIGHTER_ALPHA = 0.5;
-
-/** 算輪廓前把相鄰點補到最多相距這麼多 pt：畫太快時點很稀疏，彎處輪廓內側會反折，填色後變成白色缺口 */
-const MAX_GAP = 0.5;
-
-/** 固定線寬的輪廓（M-1 決策：不做壓感，忽略 pressure） */
-export function strokeOutline(points: Float32Array, width: number): number[][] {
-  const pts: [number, number][] = [];
-  for (let i = 0; i + 1 < points.length; i += 3) {
-    const [x, y] = [points[i], points[i + 1]];
-    if (i > 0) {
-      const [px, py] = [points[i - 3], points[i - 2]];
-      const n = Math.ceil(Math.hypot(x - px, y - py) / MAX_GAP);
-      for (let k = 1; k < n; k++) pts.push([px + ((x - px) * k) / n, py + ((y - py) * k) / n]);
-    }
-    pts.push([x, y]);
-  }
-  return getStroke(pts, {
-    size: width,
-    thinning: 0,
-    smoothing: 0.5,
-    streamline: 0.35,
-    simulatePressure: false,
-    last: true,
-  });
-}
 
 /** 中心線平滑：每點往筆尖移動的比例（越小越平滑、越跟不上筆尖） */
 const STREAMLINE = 0.5;
@@ -67,20 +41,6 @@ export function centerlineToSvgPath(c: [number, number][]): string {
   }
   const [lx, ly] = c[c.length - 1];
   return d + `L${f(lx)} ${f(ly)}`;
-}
-
-/** 輪廓轉成 SVG path（canvas 用 Path2D；M7 匯出 PDF 用 drawSvgPath） */
-export function outlineToSvgPath(outline: number[][]): string {
-  if (outline.length === 0) return '';
-  const f = (n: number) => +n.toFixed(2);
-  const [x0, y0] = outline[0];
-  let d = `M${f(x0)} ${f(y0)}`;
-  for (let i = 1; i < outline.length; i++) {
-    const [ax, ay] = outline[i - 1];
-    const [bx, by] = outline[i];
-    d += `Q${f(ax)} ${f(ay)} ${f((ax + bx) / 2)} ${f((ay + by) / 2)}`;
-  }
-  return d + 'Z';
 }
 
 /** 每一筆的中心線與 Path2D（只有一點時 path = null，畫成圓點） */

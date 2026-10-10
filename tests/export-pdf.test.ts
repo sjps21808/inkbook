@@ -67,9 +67,12 @@ describe('exportNotebookPdf', () => {
     await putElements(db, [stroke(page.id, 0, 'pen', '#000000')]);
     const doc = await PDFDocument.load(await exportNotebookPdf(db, notebook.id));
     const text = contentOf(doc.getPage(0));
-    // 模板：描邊（S）；筆跡：二次曲線轉成的三次貝茲（c 或簡寫 v）後填色（f）
+    // 模板：描邊（S）；筆跡：中心線（二次曲線轉成的三次貝茲 c／v）以線寬 4 描線（S），
+    // 圓角轉角（1 j）、圓頭線帽（1 J），不填色（沒有 f）
     expect(text).toMatch(/\bl\b[\s\S]*\bS\b/);
-    expect(text).toMatch(/\b[cv]\b[\s\S]*\bf\b/);
+    expect(text).toMatch(/\b1 j\b[\s\S]*\b4 w\b[\s\S]*\b[cv]\b[\s\S]*\bS\b/);
+    expect(text).toMatch(/\b1 J\b/);
+    expect(text).not.toMatch(/\bf\b/);
     db.close();
   });
 
@@ -80,15 +83,16 @@ describe('exportNotebookPdf', () => {
     const doc = await PDFDocument.load(await exportNotebookPdf(db, notebook.id));
     const pdfPage = doc.getPage(0);
     const text = contentOf(pdfPage);
-    const hl = text.indexOf('1 0 0 rg');
-    const pen = text.indexOf('0 0 0 rg');
+    // 筆跡是描線：顏色是描線色（RG）
+    const hl = text.indexOf('1 0 0 RG');
+    const pen = text.indexOf('0 0 0 RG');
     expect(hl).toBeGreaterThanOrEqual(0);
     expect(pen).toBeGreaterThan(hl);
 
     const gs = pdfPage.node.Resources()!.lookup(PDFName.of('ExtGState'), PDFDict);
     const states = gs.values().map((v) => doc.context.lookup(v, PDFDict));
     const multiply = states.find((s) => s.get(PDFName.of('BM')) === PDFName.of('Multiply'));
-    expect(multiply?.get(PDFName.of('ca'))?.toString()).toBe('0.5');
+    expect(multiply?.get(PDFName.of('CA'))?.toString()).toBe('0.5');
     db.close();
   });
 });

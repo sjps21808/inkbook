@@ -1,9 +1,23 @@
 import fontkit from '@pdf-lib/fontkit';
-import { BlendMode, degrees, PDFDocument, rgb, type Color, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
+import {
+  BlendMode,
+  degrees,
+  LineCapStyle,
+  LineJoinStyle,
+  PDFDocument,
+  popGraphicsState,
+  pushGraphicsState,
+  rgb,
+  setLineJoin,
+  type Color,
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+} from 'pdf-lib';
 import type { InkDatabase } from '../db/db';
 import { getBlob, listElements, listPages } from '../db/repo';
 import { PAGE_HEIGHT, PAGE_WIDTH, type ImageElement, type Page, type PageElement, type StrokeElement, type Template, type TextElement } from '../db/schema';
-import { HIGHLIGHTER_ALPHA, inkOrder, outlineToSvgPath, strokeOutline } from '../editor/stroke';
+import { centerlineToSvgPath, HIGHLIGHTER_ALPHA, inkOrder, strokeCenterline } from '../editor/stroke';
 import { TEXT_LINE_HEIGHT } from '../editor/geometry';
 import { DOT_RADIUS, TEMPLATE_COLOR, TEMPLATE_LINE_WIDTH, templateShapes } from '../editor/templates';
 import { wrapText } from '../editor/text';
@@ -113,16 +127,31 @@ export function pdfPlacement(ref: NonNullable<Page['pdf']>, crop: { width: numbe
   return { ...anchor, width: crop.width * k, height: crop.height * k, rotate: -rot };
 }
 
+/** 筆畫：和畫面相同的中心線，固定線寬描線，線帽與轉角都是圓的；只有一點時畫圓點 */
 function drawStroke(page: PDFPage, s: StrokeElement): void {
-  const d = outlineToSvgPath(strokeOutline(s.points, s.width));
-  if (!d) return;
+  const line = strokeCenterline(s.points);
+  if (!line.length) return;
   const hl = s.tool === 'highlighter';
+  const color = hexColor(s.color);
+  const opacity = hl ? HIGHLIGHTER_ALPHA : 1;
+  const blendMode = hl ? BlendMode.Multiply : BlendMode.Normal;
+  const d = centerlineToSvgPath(line);
+  if (!d) {
+    const [x, y] = line[0];
+    page.drawCircle({ x, y: PAGE_HEIGHT - y, size: s.width / 2, color, opacity, blendMode });
+    return;
+  }
+  // drawSvgPath 沒有線條轉角的選項：在外面設成圓角，push／pop 避免影響之後畫的東西
+  page.pushOperators(pushGraphicsState(), setLineJoin(LineJoinStyle.Round));
   page.drawSvgPath(d, {
     ...TOP_LEFT,
-    color: hexColor(s.color),
-    opacity: hl ? HIGHLIGHTER_ALPHA : 1,
-    blendMode: hl ? BlendMode.Multiply : BlendMode.Normal,
+    borderColor: color,
+    borderWidth: s.width,
+    borderLineCap: LineCapStyle.Round,
+    borderOpacity: opacity,
+    blendMode,
   });
+  page.pushOperators(popGraphicsState());
 }
 
 /** 圖片依位置與大小放置；rotation 目前一律為 0，畫面也不使用，所以這裡同樣忽略 */
