@@ -108,7 +108,7 @@ Vite + Preact + TS（strict）、安裝所有白名單套件、Vitest、Playwrig
 - 每個工具在 `editor/tools/index.ts` 各加一行。
 
 ### M7 匯出 PDF、深色模式
-- pdf-lib：PDF 頁用 `embedPage` 放到 A4 頁上、位置用 `pdfFit()`（2026-10-02 使用者決定，取代 `copyPages`，讓非 A4 頁與筆跡座標對齊）；模板線條用向量繪製；stroke 用 perfect-freehand outline 轉成 SVG path 後以 `drawSvgPath` 寫入；圖片嵌入；**文字嵌入 Noto Sans TC（fontkit subset）**，要能搜尋和複製。
+- pdf-lib：PDF 頁用 `embedPage` 放到 A4 頁上、位置用 `pdfFit()`（2026-10-02 使用者決定，取代 `copyPages`，讓非 A4 頁與筆跡座標對齊）；模板線條用向量繪製；stroke 用平滑後的中心線以固定線寬描線（`drawSvgPath` 的 border、圓頭線帽與圓角轉角，見 §10 2026-10-10 決策）；圖片嵌入；**文字嵌入 Noto Sans TC（fontkit subset）**，要能搜尋和複製。
 - 測試：匯出後用 pdf-lib 或 pdf.js 解析回來，檢查頁數、文字內容可以取出。
 - 深色模式：UI 預設跟隨 `prefers-color-scheme`，可以在頂端列的「外觀」選單手動指定淺色或深色（存在 `localStorage`，2026-10-03 使用者決定）；頁面維持白紙。
 
@@ -179,6 +179,7 @@ Vite + Preact + TS（strict）、安裝所有白名單套件、Vitest、Playwrig
 - 決策（2026-10-07，使用者，取代「visualViewport 反向縮放」）：**關掉 Safari 整頁縮放，只縮放白紙**（自己實作）：雙指以兩指中點縮放，範圍 1x～4x（低於 1x 放開彈回）；放大時單指拖動＝平移白紙、不翻頁，白紙邊緣不會被拖進畫面；翻頁或跳頁時回到 1x；縮放中直接放大現有畫面，放開後依倍率重繪（canvas 解析度上限不變）。選單、色盤、側欄、對話框完全不參與縮放。
 - 決策（2026-10-10，使用者，修改 M7 深色模式）：**外觀只有「淺色」「深色」**，拿掉「跟隨系統」。第一次開啟時依系統決定一次並存進 `localStorage`，之後固定，不再跟著系統變。
 - 決策（2026-10-10，使用者）：分頁列右邊回書架的「＋」改成簡易房屋圖示。
+- 決策（2026-10-10，使用者）：**筆畫改成固定線寬描線**，不再用 perfect-freehand 的輪廓填色（長筆畫會忽粗忽細：抖動的點讓輪廓方向亂跳、插入轉角帽）。畫面與匯出 PDF 共用同一條平滑後的中心線（去掉太密的點、streamline 平滑、二次曲線過中點），canvas 用 `stroke()`、PDF 用描線，線帽與轉角都是圓的。資料（原始點）不變。
 
 ## 11. 資料模型（schema v1，M2 一次定義完成）
 座標一律使用 A4 PDF 單位 595×842 pt。
