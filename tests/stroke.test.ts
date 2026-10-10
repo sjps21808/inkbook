@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { centerlineToSvgPath, drawLiveStroke, renderInk, strokeCenterline } from '../src/editor/stroke';
+import { centerlineToSvgPath, renderInk, strokeCenterline } from '../src/editor/stroke';
 import type { PageElement, StrokeElement } from '../src/db/schema';
 
 const line = (pressure: number) => {
@@ -31,9 +31,13 @@ describe('strokeCenterline', () => {
       expect(c[i][0]).toBeGreaterThan(c[i - 1][0]); // 一路往右
       if (i < c.length - 1) expect(Math.hypot(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1])).toBeGreaterThanOrEqual(1);
     }
-    const range = (ys: number[]) => Math.max(...ys) - Math.min(...ys);
+    // 抖動大小用標準差衡量（最大起伏只看最極端的一點，太不穩定）
+    const std = (ys: number[]) => {
+      const m = ys.reduce((a, b) => a + b, 0) / ys.length;
+      return Math.sqrt(ys.reduce((a, y) => a + (y - m) ** 2, 0) / ys.length);
+    };
     const rawYs = [...raw].filter((_, i) => i % 3 === 1);
-    expect(range(c.slice(5, -5).map((p) => p[1]))).toBeLessThan(range(rawYs) * 0.85);
+    expect(std(c.slice(5, -5).map((p) => p[1]))).toBeLessThan(std(rawYs) * 0.75);
   });
 
   it('起點與終點留在原位（線頭線尾停在下筆與放開的地方）', () => {
@@ -80,43 +84,17 @@ describe('centerlineToSvgPath', () => {
   });
 });
 
-describe('drawLiveStroke', () => {
-  const fakeCtx = () => {
-    const calls: string[] = [];
-    const ctx = {
-      save() {},
-      restore() {},
-      setTransform() {},
-      beginPath() {},
-      moveTo: () => calls.push('moveTo'),
-      lineTo: () => calls.push('lineTo'),
-      arc: () => calls.push('arc'),
-      stroke: () => calls.push('stroke'),
-      fill: () => calls.push('fill'),
-    };
-    return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
-  };
-  const stroke = (points: number[]): StrokeElement => ({
-    id: '',
-    pageId: '',
-    z: 0,
-    type: 'stroke',
-    tool: 'pen',
-    color: '#000',
-    width: 3,
-    points: new Float32Array(points),
-  });
-
-  it('直接用原始點畫一條折線（每個點一次 lineTo、只 stroke 一次），不算輪廓', () => {
-    const { ctx, calls } = fakeCtx();
-    drawLiveStroke(ctx, stroke(Array.from(line(0.5))), 2);
-    expect(calls).toEqual(['moveTo', ...Array(20).fill('lineTo'), 'stroke']);
-  });
-
-  it('單點畫成圓點', () => {
-    const { ctx, calls } = fakeCtx();
-    drawLiveStroke(ctx, stroke([10, 10, 0.5]), 2);
-    expect(calls).toEqual(['arc', 'fill']);
+describe('中心線的轉角', () => {
+  it('急轉彎（90 度）的轉角保持完整：平滑後的頂點離原本的轉角不到 0.6pt，也不會落後筆尖', () => {
+    // 往右 30pt、再往下 30pt；點距 1.5pt
+    const a: number[] = [];
+    for (let x = 0; x <= 30; x += 1.5) a.push(x, 0, 0.5);
+    for (let y = 1.5; y <= 30; y += 1.5) a.push(30, y, 0.5);
+    const c = strokeCenterline(new Float32Array(a));
+    const nearest = Math.min(...c.map(([x, y]) => Math.hypot(x - 30, y)));
+    expect(nearest).toBeLessThan(0.6);
+    // 直線段上的點不偏離（沒有落後造成的位移）
+    for (const [x, y] of c) if (x < 27) expect(Math.abs(y)).toBeLessThan(1e-9);
   });
 });
 

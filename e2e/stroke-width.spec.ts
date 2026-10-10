@@ -58,3 +58,51 @@ test('長而抖動的筆畫：各處粗細一致（最粗與最細相差不超�
     await page.waitForTimeout(200);
   }
 });
+
+test('書寫中的預覽和放開後的正式筆畫一模一樣（放開時不會跳、轉角不會缺）', async ({ page }) => {
+  await openNewNotebook(page, '預覽', false);
+  // 有急轉彎的鋸齒線（點距約 3pt），筆先不放開
+  const pixels = (sel: string) =>
+    page.evaluate((sel) => {
+      const cv = document.querySelector<HTMLCanvasElement>(`.page[data-index="0"] ${sel}`)!;
+      const d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+      const a: number[] = [];
+      for (let i = 3; i < d.length; i += 4) a.push(d[i]);
+      return a;
+    }, sel);
+  await page.evaluate(() => {
+    const pageEl = document.querySelector('.page[data-index="0"]')!;
+    const target = pageEl.querySelector('.overlay')!;
+    const r = pageEl.getBoundingClientRect();
+    const k = r.width / 595;
+    const pts: [number, number][] = [];
+    for (let i = 0; i <= 120; i++) pts.push([100 + i * 3, 300 + ((i % 20) < 10 ? i % 10 : 10 - (i % 10)) * 6]);
+    const fire = (type: string, [x, y]: [number, number]) =>
+      target.dispatchEvent(
+        new PointerEvent(type, { pointerType: 'pen', pointerId: 7, isPrimary: true, pressure: 0.5, clientX: r.left + x * k, clientY: r.top + y * k, bubbles: true, cancelable: true }),
+      );
+    fire('pointerdown', pts[0]);
+    for (const p of pts.slice(1)) fire('pointermove', p);
+    (window as unknown as { __last: [number, number] }).__last = pts[pts.length - 1];
+  });
+  // 等預覽畫好
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const live = await pixels('canvas.live');
+  await page.evaluate(() => {
+    const pageEl = document.querySelector('.page[data-index="0"]')!;
+    const r = pageEl.getBoundingClientRect();
+    const k = r.width / 595;
+    const [x, y] = (window as unknown as { __last: [number, number] }).__last;
+    pageEl.querySelector('.overlay')!.dispatchEvent(
+      new PointerEvent('pointerup', { pointerType: 'pen', pointerId: 7, isPrimary: true, clientX: r.left + x * k, clientY: r.top + y * k, bubbles: true, cancelable: true }),
+    );
+  });
+  await page.waitForTimeout(300);
+  const ink = await pixels('canvas.ink');
+  expect(live.length).toBe(ink.length);
+  const painted = ink.filter((a) => a > 0).length;
+  expect(painted).toBeGreaterThan(1000);
+  let diff = 0;
+  for (let i = 0; i < ink.length; i++) if (Math.abs(ink[i] - live[i]) > 2) diff++;
+  expect(diff).toBe(0);
+});

@@ -10,7 +10,7 @@ import {
 import type { PdfDocs, PdfRef, RenderJob } from '../pdf/render';
 import { TEXT_LINE_HEIGHT } from './geometry';
 import type { ImageCache } from './images';
-import { drawLiveStroke, drawStroke, renderInk } from './stroke';
+import { drawStroke, renderInk } from './stroke';
 import { blurEditing, focusProxy } from './text';
 import { drawTemplate } from './templates';
 import type { ToolDef } from './tools';
@@ -202,7 +202,8 @@ export function PageCanvas(props: Props) {
     const drawLive = () => {
       raf = 0;
       clearLive();
-      if (pointerId !== null) drawLiveStroke(live.getContext('2d')!, current(), scaleRef.current);
+      // 預覽和放開後的正式筆畫用同一套畫法（平滑的中心線），放開時不會跳
+      if (pointerId !== null) drawStroke(live.getContext('2d')!, current(), scaleRef.current);
     };
     const schedule = () => {
       if (!raf) raf = requestAnimationFrame(drawLive);

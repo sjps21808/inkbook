@@ -2,31 +2,32 @@ import type { ImageElement, PageElement, StrokeElement } from '../db/schema';
 
 export const HIGHLIGHTER_ALPHA = 0.5;
 
-/** 中心線平滑：每點往筆尖移動的比例（越小越平滑、越跟不上筆尖） */
-const STREAMLINE = 0.5;
-/** 平滑後的點至少相距這麼多 pt 才輸出（去掉太密的點與往回跳的抖動） */
+/** 距離上一個保留點不到這麼多 pt 的點丟掉（去掉太密的點與往回跳的抖動） */
 const MIN_STEP = 1;
 
 /**
- * 筆畫的中心線（畫面與匯出 PDF 共用；2026-10-10 決策：固定線寬描線，不用輪廓填色）。
- * 指數平滑追蹤筆尖，移動超過 MIN_STEP 才輸出一點；最後一點保留原位，線尾停在放開的地方。忽略 pressure
+ * 筆畫的中心線（畫面、書寫中的預覽與匯出 PDF 共用；2026-10-10 決策：固定線寬描線，不用輪廓填色）。
+ * 先丟掉離上一個保留點不到 MIN_STEP 的點，再做一次前後點 1:2:1 加權平均：
+ * 對稱的平均不會落後筆尖，急轉彎的轉角保持完整（不像追著筆尖的平滑會切掉轉角）。
+ * 起點與終點不動，線頭線尾停在下筆與放開的地方。忽略 pressure
  */
 export function strokeCenterline(points: Float32Array): [number, number][] {
   const n = Math.floor(points.length / 3);
   if (n === 0) return [];
-  let [sx, sy] = [points[0], points[1]];
-  const out: [number, number][] = [[sx, sy]];
+  const kept: [number, number][] = [[points[0], points[1]]];
   for (let i = 1; i < n; i++) {
     const [x, y] = [points[i * 3], points[i * 3 + 1]];
-    sx += (x - sx) * STREAMLINE;
-    sy += (y - sy) * STREAMLINE;
-    const [lx, ly] = out[out.length - 1];
-    if (Math.hypot(sx - lx, sy - ly) >= MIN_STEP) out.push([sx, sy]);
+    const [lx, ly] = kept[kept.length - 1];
+    if (Math.hypot(x - lx, y - ly) >= MIN_STEP) kept.push([x, y]);
   }
   const [ex, ey] = [points[(n - 1) * 3], points[(n - 1) * 3 + 1]];
-  const [lx, ly] = out[out.length - 1];
-  if (n > 1 && (lx !== ex || ly !== ey)) out.push([ex, ey]);
-  return out;
+  const [lx, ly] = kept[kept.length - 1];
+  if (n > 1 && (lx !== ex || ly !== ey)) kept.push([ex, ey]);
+  return kept.map((p, i) => {
+    if (i === 0 || i === kept.length - 1) return p;
+    const [a, b] = [kept[i - 1], kept[i + 1]];
+    return [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4];
+  });
 }
 
 /** 中心線轉成 SVG path：二次曲線通過各段中點；只有一點時是空字串（畫成圓點） */
@@ -57,7 +58,7 @@ function strokePath(s: StrokeElement) {
   return p;
 }
 
-/** 畫一筆：中心線以固定線寬描線（線帽、轉角都是圓的）；scale = canvas 像素 / pt */
+/** 畫一筆（書寫中的預覽也用這個，放開時不會跳）：中心線以固定線寬描線，線帽、轉角都是圓的；scale = canvas 像素 / pt */
 export function drawStroke(ctx: CanvasRenderingContext2D, s: StrokeElement, scale: number): void {
   const { line, path } = strokePath(s);
   if (!line.length) return;
@@ -78,36 +79,6 @@ export function drawStroke(ctx: CanvasRenderingContext2D, s: StrokeElement, scal
     ctx.beginPath();
     ctx.arc(line[0][0], line[0][1], s.width / 2, 0, Math.PI * 2);
     ctx.fill();
-  }
-  ctx.restore();
-}
-
-/**
- * 書寫中的即時預覽：直接用原始點畫一條圓頭折線（canvas 原生 stroke），不算 perfect-freehand 輪廓。
- * 每個 frame 重算整筆輪廓會隨筆畫變長越來越慢，快速書寫時筆跡跟不上筆尖；放開後才用 drawStroke 畫正式的一筆。
- */
-export function drawLiveStroke(ctx: CanvasRenderingContext2D, s: StrokeElement, scale: number): void {
-  const p = s.points;
-  if (p.length < 3) return;
-  ctx.save();
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  ctx.strokeStyle = s.color;
-  ctx.fillStyle = s.color;
-  ctx.lineWidth = s.width;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  if (s.tool === 'highlighter') {
-    ctx.globalAlpha = HIGHLIGHTER_ALPHA;
-    ctx.globalCompositeOperation = 'multiply';
-  }
-  ctx.beginPath();
-  if (p.length < 6) {
-    ctx.arc(p[0], p[1], s.width / 2, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.moveTo(p[0], p[1]);
-    for (let i = 3; i + 1 < p.length; i += 3) ctx.lineTo(p[i], p[i + 1]);
-    ctx.stroke();
   }
   ctx.restore();
 }
