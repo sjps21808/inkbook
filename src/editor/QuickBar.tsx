@@ -31,6 +31,20 @@ const TOOL_ICONS: Record<string, () => ComponentChildren> = {
 
 const WIDTH_ICONS = [1.5, 3, 5];
 
+/**
+ * 按鈕在手指（或筆）一碰到時就動作，不等 click：iPad 上快速連點兩個按鈕時，
+ * 第二下常被 Safari 當成雙擊而收不到 click，看起來像沒反應。
+ * 鍵盤操作（Enter／空白鍵）沒有 pointerdown，click 的 detail = 0，照樣用 click 觸發
+ */
+const tap = (fn: () => void) => ({
+  onPointerDown: (e: PointerEvent) => {
+    if (e.button === 0 && !(e.currentTarget as HTMLButtonElement).disabled) fn();
+  },
+  onClick: (e: MouseEvent) => {
+    if (e.detail === 0) fn();
+  },
+});
+
 interface Props {
   state: ToolState;
   onChange(s: ToolState): void;
@@ -61,13 +75,13 @@ function ToolButton({ id, state, onChange }: { id: string; state: ToolState; onC
         aria-pressed={active}
         aria-haspopup={t.options ? 'true' : undefined}
         aria-expanded={t.options ? open : undefined}
-        onClick={() => {
+        {...tap(() => {
           if (active && t.options) setOpen((o) => !o);
           else {
             setOpen(false);
             onChange({ ...state, toolId: id });
           }
-        }}
+        })}
       >
         <ToolIcon />
         {active && t.options && <ChevronIcon />}
@@ -100,7 +114,7 @@ export function QuickBar(props: Props) {
         class="menu-toggle"
         aria-label={menuOpen ? '收起選單' : '展開選單'}
         aria-expanded={menuOpen}
-        onClick={onToggleMenu}
+        {...tap(onToggleMenu)}
       >
         <MenuToggleIcon open={menuOpen} />
       </button>
@@ -114,7 +128,7 @@ export function QuickBar(props: Props) {
           key={label}
           aria-label={label}
           aria-pressed={state.widthIdx === i}
-          onClick={() => onChange({ ...state, widthIdx: i })}
+          {...tap(() => onChange({ ...state, widthIdx: i }))}
         >
           <WidthIcon width={WIDTH_ICONS[i]} />
         </button>
@@ -122,19 +136,19 @@ export function QuickBar(props: Props) {
       <span class="sep" />
       <ColorPicker value={state.color} onChange={(color) => onChange({ ...state, color })} />
       <span class="sep" />
-      <button aria-label="復原" disabled={!canUndo} onClick={onUndo}>
+      <button aria-label="復原" disabled={!canUndo} {...tap(onUndo)}>
         <UndoIcon />
       </button>
-      <button aria-label="重做" disabled={!canRedo} onClick={onRedo}>
+      <button aria-label="重做" disabled={!canRedo} {...tap(onRedo)}>
         <RedoIcon />
       </button>
       {hasSelection && (
         <>
           <span class="sep" />
-          <button aria-label="複製選取" onClick={props.onDuplicate}>
+          <button aria-label="複製選取" {...tap(props.onDuplicate)}>
             <DuplicateIcon />
           </button>
-          <button aria-label="刪除選取" onClick={props.onDeleteSelection}>
+          <button aria-label="刪除選取" {...tap(props.onDeleteSelection)}>
             <TrashIcon />
           </button>
         </>

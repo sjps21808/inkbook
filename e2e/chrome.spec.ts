@@ -159,3 +159,25 @@ test('大選單收起時，資訊列上的「有新版本」也看得到、點�
   await btn.click();
   await expect(btn).toHaveAttribute('data-clicked', '1');
 });
+
+test('快捷列按鈕一碰到（pointerdown）就切換，不用等 click；鍵盤 Enter 也能用', async ({ page }) => {
+  const q = quick(page);
+  const down = (name: string) =>
+    q.getByRole('button', { name, exact: true }).dispatchEvent('pointerdown', { button: 0, pointerType: 'touch', isPrimary: true });
+  // iPad 快速連點時第二下可能收不到 click：只送 pointerdown 也要切過去
+  await down('橡皮擦');
+  await down('套索');
+  await expect(q.getByRole('button', { name: '套索', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await down('筆');
+  await down('粗');
+  await expect(q.getByRole('button', { name: '筆', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(q.getByRole('button', { name: '粗', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  // 一般點擊（pointerdown + click）只動作一次：選中的套索再點一次 → 跳出模式選單，不會開了又關
+  await q.getByRole('button', { name: '套索', exact: true }).click();
+  await q.getByRole('button', { name: '套索', exact: true }).click();
+  await expect(page.getByRole('group', { name: '套索模式' })).toBeVisible();
+  // 鍵盤
+  await q.getByRole('button', { name: '螢光筆', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(q.getByRole('button', { name: '螢光筆', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});
