@@ -4,25 +4,35 @@ export const HIGHLIGHTER_ALPHA = 0.5;
 
 /** 距離上一個保留點不到這麼多 pt 的點丟掉（去掉太密的點與往回跳的抖動） */
 const MIN_STEP = 1;
+/** 和最近這麼多個點座標完全相同的點視為重送（iPad Safari 的合併事件會重送上一批點，見 CLAUDE.md §10 2026-10-11） */
+const REPLAY_WINDOW = 8;
 
 /**
  * 筆畫的中心線（畫面、書寫中的預覽與匯出 PDF 共用；2026-10-10 決策：固定線寬描線，不用輪廓填色）。
  * 先丟掉離上一個保留點不到 MIN_STEP 的點，再做一次前後點 1:2:1 加權平均：
  * 對稱的平均不會落後筆尖，急轉彎的轉角保持完整（不像追著筆尖的平滑會切掉轉角）。
- * 起點與終點不動，線頭線尾停在下筆與放開的地方。忽略 pressure
+ * 起點與終點不動，線頭線尾停在下筆與放開的地方。忽略 pressure。
+ * 先略過重送的點：已存的舊筆跡裡也有，畫的時候一併去掉（資料不變）
  */
 export function strokeCenterline(points: Float32Array): [number, number][] {
   const n = Math.floor(points.length / 3);
   if (n === 0) return [];
   const kept: [number, number][] = [[points[0], points[1]]];
+  const recent: [number, number][] = [[points[0], points[1]]];
+  // 最後一個不是重送的點：線尾停在這裡（最後一個原始點也可能是重送的）
+  let end: [number, number] = [points[0], points[1]];
   for (let i = 1; i < n; i++) {
     const [x, y] = [points[i * 3], points[i * 3 + 1]];
+    if (recent.some(([rx, ry]) => rx === x && ry === y)) continue;
+    end = [x, y];
+    recent.push([x, y]);
+    if (recent.length > REPLAY_WINDOW) recent.shift();
     const [lx, ly] = kept[kept.length - 1];
     if (Math.hypot(x - lx, y - ly) >= MIN_STEP) kept.push([x, y]);
   }
-  const [ex, ey] = [points[(n - 1) * 3], points[(n - 1) * 3 + 1]];
+  const [ex, ey] = end;
   const [lx, ly] = kept[kept.length - 1];
-  if (n > 1 && (lx !== ex || ly !== ey)) kept.push([ex, ey]);
+  if (lx !== ex || ly !== ey) kept.push([ex, ey]);
   return kept.map((p, i) => {
     if (i === 0 || i === kept.length - 1) return p;
     const [a, b] = [kept[i - 1], kept[i + 1]];
