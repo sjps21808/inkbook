@@ -93,15 +93,17 @@ test('淺色模式維持原本的配色', async ({ page }) => {
 const theme = (page: Page) => page.getByRole('combobox', { name: '外觀' });
 
 test.describe('外觀選單', () => {
-  test('系統深色時選「淺色」→ UI 變淺色；改回「跟隨系統」→ 深色', async ({ page }) => {
+  test('只有淺色、深色；第一次開啟依系統（深色），選「淺色」→ UI 變淺色，系統再變也不跟著變', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await openNewNotebook(page);
-    await expect(theme(page)).toHaveValue('system');
+    await expect(theme(page).locator('option')).toHaveText(['淺色', '深色']);
+    await expect(theme(page)).toHaveValue('dark');
     await theme(page).selectOption({ label: '淺色' });
     expect(await bgColor(page, 'body')).toBe('rgb(242, 242, 245)');
     expect(await bgColor(page, '.toolbar', 'bottom')).toBe('rgb(249, 249, 251)');
-    await theme(page).selectOption({ label: '跟隨系統' });
-    expect(await bgColor(page, 'body')).toBe('rgb(0, 0, 0)');
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.emulateMedia({ colorScheme: 'dark' });
+    expect(await bgColor(page, 'body')).toBe('rgb(242, 242, 245)');
   });
 
   test('系統淺色時選「深色」→ UI 變深色、頁面仍是白紙；重新整理後設定還在', async ({ page }) => {
