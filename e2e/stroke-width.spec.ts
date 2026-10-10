@@ -62,14 +62,8 @@ test('長而抖動的筆畫：各處粗細一致（最粗與最細相差不超�
 test('書寫中的預覽和放開後的正式筆畫一模一樣（放開時不會跳、轉角不會缺）', async ({ page }) => {
   await openNewNotebook(page, '預覽', false);
   // 有急轉彎的鋸齒線（點距約 3pt），筆先不放開
-  const pixels = (sel: string) =>
-    page.evaluate((sel) => {
-      const cv = document.querySelector<HTMLCanvasElement>(`.page[data-index="0"] ${sel}`)!;
-      const d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
-      const a: number[] = [];
-      for (let i = 3; i < d.length; i += 4) a.push(d[i]);
-      return a;
-    }, sel);
+  // 在瀏覽器裡比對（整張 canvas 的像素傳回 Node 太慢，CI 會逾時）；只比對筆畫所在的區域
+  // （A4 座標 x 80～480、y 280～380；兩次 evaluate 用同一個算式）
   await page.evaluate(() => {
     const pageEl = document.querySelector('.page[data-index="0"]')!;
     const target = pageEl.querySelector('.overlay')!;
@@ -87,7 +81,13 @@ test('書寫中的預覽和放開後的正式筆畫一模一樣（放開時不�
   });
   // 等預覽畫好
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-  const live = await pixels('canvas.live');
+  await page.evaluate(() => {
+    const cv = document.querySelector<HTMLCanvasElement>('.page[data-index="0"] canvas.live')!;
+    const s = cv.width / 595;
+    (window as unknown as { __live: Uint8ClampedArray }).__live = cv
+      .getContext('2d')!
+      .getImageData(Math.floor(80 * s), Math.floor(280 * s), Math.ceil(400 * s), Math.ceil(100 * s)).data;
+  });
   await page.evaluate(() => {
     const pageEl = document.querySelector('.page[data-index="0"]')!;
     const r = pageEl.getBoundingClientRect();
@@ -98,11 +98,22 @@ test('書寫中的預覽和放開後的正式筆畫一模一樣（放開時不�
     );
   });
   await page.waitForTimeout(300);
-  const ink = await pixels('canvas.ink');
-  expect(live.length).toBe(ink.length);
-  const painted = ink.filter((a) => a > 0).length;
-  expect(painted).toBeGreaterThan(1000);
-  let diff = 0;
-  for (let i = 0; i < ink.length; i++) if (Math.abs(ink[i] - live[i]) > 2) diff++;
-  expect(diff).toBe(0);
+  const r = await page.evaluate(() => {
+    const cv = document.querySelector<HTMLCanvasElement>('.page[data-index="0"] canvas.ink')!;
+    const s = cv.width / 595;
+    const ink = cv
+      .getContext('2d')!
+      .getImageData(Math.floor(80 * s), Math.floor(280 * s), Math.ceil(400 * s), Math.ceil(100 * s)).data;
+    const live = (window as unknown as { __live: Uint8ClampedArray }).__live;
+    let painted = 0;
+    let diff = 0;
+    for (let i = 3; i < ink.length; i += 4) {
+      if (ink[i] > 0) painted++;
+      if (Math.abs(ink[i] - live[i]) > 2) diff++;
+    }
+    return { same: ink.length === live.length, painted, diff };
+  });
+  expect(r.same).toBe(true);
+  expect(r.painted).toBeGreaterThan(1000);
+  expect(r.diff).toBe(0);
 });
