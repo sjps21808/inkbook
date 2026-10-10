@@ -159,6 +159,18 @@ export function PageCanvas(props: Props) {
     const live = liveRef.current!;
     let pointerId: number | null = null;
     let pts: number[] = [];
+    // 最後收到的點（時間與畫面位置）：iPad Safari 的 getCoalescedEvents() 會把上一次 pointermove
+    // 已經給過的點再送一次（CLAUDE.md §10 2026-10-11），用來略過重送的點
+    let lastT = -Infinity;
+    let lastX = NaN;
+    let lastY = NaN;
+    /** 這個合併事件是新的點（不是重送的） */
+    const fresh = (e: PointerEvent) => {
+      if (e.timeStamp < lastT) return false;
+      if (e.timeStamp === lastT && e.clientX === lastX && e.clientY === lastY) return false;
+      [lastT, lastX, lastY] = [e.timeStamp, e.clientX, e.clientY];
+      return true;
+    };
     let raf = 0;
     let session: ToolSession | null = null;
     // 每次預覽遞增；寫入完成時只在之後沒有新預覽的情況下清除
@@ -266,6 +278,8 @@ export function PageCanvas(props: Props) {
         return;
       }
       pts = [];
+      lastT = -Infinity;
+      fresh(e);
       toPage(e);
       schedule();
     };
@@ -274,6 +288,7 @@ export function PageCanvas(props: Props) {
       e.preventDefault();
       const evs = e.getCoalescedEvents?.() ?? [];
       for (const ce of evs.length ? evs : [e]) {
+        if (!fresh(ce)) continue;
         if (session) session.move(toPoint(ce));
         else toPage(ce);
       }
