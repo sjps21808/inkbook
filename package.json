@@ -20,7 +20,7 @@
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "6.3.289",
     "perfect-freehand": "1.2.3",
-    "preact": "11.0.0"
+    "preact": "11.0.1"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
